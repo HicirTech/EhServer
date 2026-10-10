@@ -3,7 +3,11 @@ import { describe, expect, test } from "bun:test";
 
 import { galleryRow, listPageHtml } from "../../fixtures/eh/list-page";
 import { galleryToplistPageHtml, toplistRow } from "../../fixtures/eh/toplist-page";
-import { parseGalleryToplistPage, type ToplistPeriod } from "../../src/eh-core/toplist-page";
+import {
+  galleryToplistRequest,
+  parseGalleryToplistPage,
+  type ToplistPeriod,
+} from "../../src/eh-core/toplist-page";
 
 const Rows = [
   toplistRow({
@@ -117,6 +121,19 @@ describe("parseGalleryToplistPage", () => {
       kind: "unrecognized",
       marker: "h1.ih a[href]",
       raw: "",
+    });
+  });
+});
+
+describe("galleryToplistRequest", () => {
+  test("asks for the period's toplist, the first page without p as the site links it", () => {
+    expect(galleryToplistRequest("yesterday", 0)).toEqual({
+      site: "eh",
+      target: "/toplist.php?tl=15",
+    });
+    expect(galleryToplistRequest("allTime", 3)).toEqual({
+      site: "eh",
+      target: "/toplist.php?tl=11&p=3",
     });
   });
 });

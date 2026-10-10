@@ -14,6 +14,7 @@ import {
   success,
   unrecognized,
 } from "./parse-result";
+import type { UpstreamRequest } from "./upstream-request";
 
 export type ToplistPeriod = "allTime" | "pastYear" | "pastMonth" | "yesterday";
 
@@ -39,6 +40,12 @@ const GalleryToplistCodes: Readonly<Record<ToplistPeriod, number>> = {
   pastMonth: 13,
   yesterday: 15,
 };
+
+/** One page of a galleries toplist; like the site's own links, the first page has no `p`. */
+export function galleryToplistRequest(period: ToplistPeriod, page: number): UpstreamRequest {
+  const list = `/toplist.php?tl=${GalleryToplistCodes[period]}`;
+  return { site: "eh", target: page === 0 ? list : `${list}&p=${page}` };
+}
 
 export function parseGalleryToplistPage(
   html: string,
