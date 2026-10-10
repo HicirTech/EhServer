@@ -4,6 +4,7 @@ import { describe, expect, test } from "bun:test";
 import { createApp } from "../../src/http/app";
 import { problemResponse } from "../../src/http/problem";
 import type { Route } from "../../src/http/router";
+import { problemFindings } from "../support/contract";
 
 const RequestId = "req_test";
 
@@ -81,6 +82,27 @@ describe("app", () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toMatchObject({ code: "internal_error", requestId: RequestId });
     expect(errors).toEqual([{ error: fault, requestId: RequestId }]);
+  });
+
+  test("MAINT-2: the problems for an unknown path, a wrong method and a fault match the contract", async () => {
+    const failing: Route = {
+      method: "GET",
+      path: "/api/v1/broken",
+      handler: () => {
+        throw new Error("fault");
+      },
+    };
+    const app = appWith([echo, failing]);
+
+    const responses = await Promise.all([
+      app.fetch(get("/api/v1/nothing")),
+      app.fetch(get("/api/v1/things/a", "DELETE")),
+      app.fetch(get("/api/v1/broken")),
+    ]);
+
+    for (const response of responses) {
+      expect(await problemFindings(response)).toEqual([]);
+    }
   });
 });
 

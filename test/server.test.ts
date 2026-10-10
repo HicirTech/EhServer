@@ -8,6 +8,7 @@ import { CatalogSize } from "../mock/catalog";
 import { startMock } from "../mock/server";
 import { createLogger } from "../src/log/logger";
 import { startServer } from "../src/main";
+import { responseFindings } from "./support/contract";
 
 const mock = startMock();
 const dataDir = mkdtempSync(join(tmpdir(), "ehserver-data-"));
@@ -56,8 +57,10 @@ describe("EhServer", () => {
     const first = await getToplist("galleries?period=pastMonth");
     expect(first.status).toBe(202);
     expect(Number(first.headers.get("Retry-After"))).toBeGreaterThanOrEqual(1);
+    expect(await responseFindings("getToplist", first)).toEqual([]);
 
     const served = await whenServed("galleries?period=pastMonth");
+    expect(await responseFindings("getToplist", served)).toEqual([]);
     const body = (await served.json()) as { readonly entries: readonly unknown[] };
 
     expect(served.status).toBe(200);
@@ -70,6 +73,6 @@ describe("EhServer", () => {
     const response = await getToplist("tagging?period=yesterday");
 
     expect(response.status).toBe(501);
-    expect(response.headers.get("Content-Type")).toBe("application/problem+json");
+    expect(await responseFindings("getToplist", response)).toEqual([]);
   });
 });
