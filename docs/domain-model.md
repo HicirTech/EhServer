@@ -80,7 +80,7 @@ A gallery summary in lists is the same aggregate with fewer fields present; it n
 | `Comment` | `commentId`, `author`, `isUploader`, `postedAt`, `editedAt` (or `null`), `score` (or `null` for the uploader's comment), `body` as sanitized HTML and as plain text |
 | `SearchQuery` | `text`; `categories` (the included set); `advanced` (named switches: `searchName`, `searchTags`, `searchDescription`, `searchTorrentNames`, `onlyWithTorrents`, `searchLowPowerTags`, `searchDownvotedTags`, `showExpunged`); `minRating` (2–5); `pages` (`from`, `to`) |
 | `SearchPage` | `items` (gallery summaries); `next` and `prev` (opaque cursors); `total` (`value`, `approximate`), when the site states it; `filteredOut`, the galleries the account's filters removed, when stated |
-| `Toplist` | `type` (`galleries`, `uploaders`, `tagging`, `hentaiAtHome`, `ehTracker`, `cleanup`, `ratingAndReviewing`), `period` (`allTime`, `pastYear`, `pastMonth`, `yesterday`), ranked entries |
+| `Toplist` | `type` (`galleries`, `uploaders`, `tagging`, `hentaiAtHome`, `ehTracker`, `cleanup`, `ratingAndReviewing`), `period` (`allTime`, `pastYear`, `pastMonth`, `yesterday`), `observedAt`, `entries` in rank order (`rank`, `score`, and a gallery ref for the galleries toplists or a `name` for the others); always the whole list ([ADR-0010](adr/0010-complete-toplists.md)) |
 
 ## 7. Value sets
 
@@ -111,6 +111,7 @@ The upstream category bitmask (`f_cats` excludes, not includes) and the label st
 - **Job:** `queued → running ⇄ paused → succeeded | failed | cancelled`. A `paused` job always carries the outcome that paused it. A job waiting for an egress or account cooldown is `paused` with that cooldown's outcome.
 - **Egress:** `ok → warned → cooldown → ok`; `ok` or `warned` → `banned` until the ban expires → `ok`; any state → `unavailable` while the egress cannot be reached.
 - **Account session:** `unknown → valid` or `expired`; `valid → expired` when a `signed_out` outcome is seen.
+- **Toplist snapshot:** `none → walking → fresh → stale → walking → fresh`. A walk that fails its checks is discarded, and the previous snapshot, if any, stays ([ADR-0010](adr/0010-complete-toplists.md)).
 
 ## 10. Invariants
 
@@ -123,6 +124,7 @@ The upstream category bitmask (`f_cats` excludes, not includes) and the label st
 | I5 | No identity is a URL, and no upstream URL leaves `eh-core`. |
 | I6 | Every instant is UTC. |
 | I7 | Every enum value in a response was mapped from a recognized upstream value. |
+| I8 | A returned toplist is a whole walk that passed every check of ADR-0010; part of a list is never returned. |
 
 ## 11. Freshness
 
@@ -132,5 +134,6 @@ The upstream category bitmask (`f_cats` excludes, not includes) and the label st
 | Page tokens | until a token error | detail pages |
 | Account state | 5 min | home page, favourites page |
 | Search pages | per account, 5 min | the search itself |
+| Toplists | 24 h, one snapshot per toplist for every user | a walk of every page, then the first and the last page again |
 
 These values are initial and live in configuration.
