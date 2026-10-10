@@ -52,7 +52,7 @@ export function gdataEntry(overrides: Partial<GdataEntry> = {}): GdataEntry {
     filecount: "24",
     filesize: 13107200,
     expunged: false,
-    rating: "4.46",
+    rating: "4.12",
     torrentcount: "1",
     torrents: [
       {

@@ -33,7 +33,7 @@ describe("parseGdata", () => {
         fileCount: 24,
         fileSize: 13107200,
         expunged: false,
-        rating: 4.46,
+        rating: 4.12,
         torrentCount: 1,
         torrents: [
           {
