@@ -22,7 +22,7 @@ EhServer is released under the [MIT License](../LICENSE).
 | [0001](adr/0001-generic-scope.md) | Generic scope, no client-specific data | Accepted |
 | [0002](adr/0002-bun-typescript-no-framework.md) | Bun and TypeScript, no framework | Accepted |
 | [0003](adr/0003-eh-core-positive-identification.md) | Rewritten E-Hentai parsers with positive identification | Accepted |
-| [0004](adr/0004-state-in-sqlite.md) | State in SQLite | Proposed |
+| [0004](adr/0004-state-in-sqlite.md) | State in SQLite | Accepted |
 | [0005](adr/0005-egress-governor.md) | One governor for all upstream traffic | Accepted in part |
 | [0006](adr/0006-users-accounts-tokens.md) | Users, E-Hentai accounts and API tokens | Proposed |
 | [0007](adr/0007-library-format.md) | The library format | Proposed |

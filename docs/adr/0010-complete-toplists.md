@@ -17,7 +17,7 @@ The site recomputes its toplists at times we do not know. A read that spans a re
   - the ranks run from 1 to the last entry without a gap;
   - no gallery appears twice;
   - the first and the last page, read again, equal their first reading.
-- A walk that fails these checks is discarded: the list moved while it was read. The next walk starts 10 minutes later, or an hour later after three discarded walks in a row. A walk that meets a failure outcome follows that outcome's action ([outcomes.md](../outcomes.md)).
+- A walk that fails these checks is discarded: the list moved while it was read. The next walk starts 10 minutes later, or an hour later after three discarded walks in a row. A walk that a page stops, by a failure outcome, an unrecognized page or no answer, waits 10 minutes or the outcome's cooldown when that is longer ([outcomes.md](../outcomes.md)).
 - A snapshot is a global fact: one per toplist, shared by every user ([domain-model.md](../domain-model.md) I1). It is fresh for 24 hours.
 - Walks start only on demand, when a request finds no snapshot or a stale one. One walk runs at a time per toplist. Walks have background priority: a client's page load goes before a walk's next page.
 - With a snapshot, fresh or stale, `getToplist` answers 200 at once with the snapshot's `observedAt`; a stale snapshot also queues a walk. Without a snapshot it answers 202 with the walk's progress and a `Retry-After`.
