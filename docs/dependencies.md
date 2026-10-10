@@ -15,4 +15,4 @@ Runtime: Bun 1.4.2 (`engines` in `package.json`; CI pins the same version).
 | domutils | 4.0.2 | spike | Text and attribute helpers for those nodes | BSD-2-Clause |
 | entities | 8.1.0 | spike | Decodes entities for the `HTMLRewriter` variant | BSD-2-Clause |
 
-The spike packages are development dependencies until ADR-0009 is decided. If it is accepted, htmlparser2, css-select, domhandler and domutils become runtime dependencies when `eh-core` starts, and `entities` stays only as a dependency of htmlparser2.
+ADR-0009 is accepted. The spike packages stay development dependencies until `eh-core` starts; then htmlparser2, css-select, domhandler and domutils become runtime dependencies, and `entities` stays only as a dependency of htmlparser2.

@@ -1,6 +1,6 @@
 # ADR-0009: How HTML is parsed
 
-- Status: Proposed (2026-10-10), after the spike below. The maintainer decides.
+- Status: Accepted (maintainer, 2026-10-10), after the spike below.
 
 ## Context
 
@@ -34,16 +34,17 @@ Also tried:
 - node-html-parser 9.0.4 drops a table whose `</tr>` is omitted: `<table class="itg"><tr><td>x</td></table>` parses as `<td>x</td>`. It lost the gallery table of both captured extended-mode list pages. Rejected.
 - parse5 8.0.1 handles every omitted end tag above and builds the same tree as browsers, `tbody` included. It has no selector engine. Checked on the reproductions and four captured pages only.
 
-## Decision (proposed)
+## Decision
 
 - Parse with htmlparser2 and query with css-select, through two small wrappers (`find`, `findAll`).
 - Selectors use descendant combinators and never name `tbody`: browsers insert it, htmlparser2 does not.
 - The parser choice does not replace positive identification. Every field still goes through a decoder that rejects what it does not recognize.
 
-Recommendation: htmlparser2 with css-select, because it returns the right text where `HTMLRewriter` silently does not, with less than half the code. Choose `HTMLRewriter` only if the dependency count must be minimal and every parsed page is known to close its cells, paragraphs and list items.
+Reason: htmlparser2 returns the right text where `HTMLRewriter` silently does not, with less than half the code.
 
 ## Consequences
 
 - Ten packages are pinned and listed in [dependencies.md](../dependencies.md), and they are updated together.
 - parse5 stays the fallback if a page ever needs the browser's exact tree.
+- `HTMLRewriter` is reconsidered only if a page must be parsed while it arrives, and only for pages known to close their cells, paragraphs and list items.
 - The spike is deleted when `eh-core` has its first parsers (N6).
