@@ -1,9 +1,16 @@
 /** The mock's behaviour that later tests of the server rely on (nfr.md TEST-1, outcomes.md R7). */
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 
-import { CatalogSize, FirstGid, galleryToken, ListPageSize } from "../mock/catalog";
+import {
+  CatalogSize,
+  FirstGid,
+  galleryToken,
+  ListPageSize,
+  ToplistPageSize,
+} from "../mock/catalog";
 import { type FaultName, RetryAfterSeconds } from "../mock/faults";
 import { startMock } from "../mock/server";
+import { parseGalleryToplistPage } from "../src/eh-core/toplist-page";
 
 const mock = startMock();
 const NewestGid = FirstGid + CatalogSize - 1;
@@ -219,3 +226,56 @@ describe("TEST-1: mock faults", () => {
     expect(await getText("/")).toStartWith("Your IP address");
   });
 });
+
+describe("mock toplists", () => {
+  async function toplistPage(query: string) {
+    const result = parseGalleryToplistPage(await getText(`/toplist.php?${query}`), "yesterday");
+    if (result.kind !== "success") {
+      throw new Error(`expected a toplist page, got ${JSON.stringify(result)}`);
+    }
+
+    return result.value;
+  }
+
+  test("a galleries toplist ranks the whole catalogue, 50 to a page", async () => {
+    const first = await toplistPage("tl=15");
+    const second = await toplistPage("tl=15&p=1");
+
+    expect(first).toMatchObject({ page: 0, pageCount: 2 });
+    expect(first.entries.map((entry) => entry.rank)).toEqual(ranks(1, ToplistPageSize));
+    expect(second.entries.map((entry) => entry.rank)).toEqual(ranks(51, CatalogSize - 50));
+    const gids = [...first.entries, ...second.entries].map((entry) => entry.gallery.gid);
+    expect(new Set(gids).size).toBe(CatalogSize);
+  });
+
+  test("a recomputation moves every gallery up one place", async () => {
+    const before = await toplistPage("tl=15");
+    mock.recomputeToplists();
+    const after = await toplistPage("tl=15");
+
+    expect(after.entries[0]?.gallery).toEqual(before.entries[1]?.gallery);
+  });
+
+  test("the control API recomputes the toplists over HTTP", async () => {
+    const before = await toplistPage("tl=15");
+    const recomputed = await fetch(`${mock.url}/__mock/toplists/recompute`, { method: "POST" });
+    const after = await toplistPage("tl=15");
+
+    expect(recomputed.status).toBe(204);
+    expect(after.entries[0]?.gallery).toEqual(before.entries[1]?.gallery);
+  });
+
+  test("another toplist type, a page past the last and ExHentai are not found", async () => {
+    const responses = await Promise.all([
+      get("/toplist.php?tl=21"),
+      get("/toplist.php?tl=15&p=2"),
+      get("/toplist.php?tl=15", "exhentai.org"),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([404, 404, 404]);
+  });
+});
+
+function ranks(from: number, count: number): number[] {
+  return Array.from({ length: count }, (_, index) => from + index);
+}

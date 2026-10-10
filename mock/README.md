@@ -10,8 +10,9 @@ The upstream URL `https://<host>/<path>` is served at `<mock url>/<host>/<path>`
 |---|---|
 | `/` with `f_search`, `next`, `prev` | a compact-mode search page, 25 galleries, newest first; `f_search` is one phrase, matched in titles and tags |
 | `/g/<gid>/<token>/` with `p` | a gallery page and its `p`-th page of 20 previews |
+| `/toplist.php` with `tl` and `p`, on `e-hentai.org` | a galleries toplist (`tl` 11, 12, 13 or 15): the whole catalogue ranked, 50 to a page, `p` counted from 0 |
 
-The catalogue holds galleries 9000001 to 9000060 (`catalog.ts`). A gallery URL with an unknown gid or a wrong token gets the site's "Key missing" error box.
+The catalogue holds galleries 9000001 to 9000060 (`catalog.ts`). A gallery URL with an unknown gid or a wrong token gets the site's "Key missing" error box. Each toplist ranks the catalogue in its own order; a recomputation (`mock.recomputeToplists()`) moves every gallery up one place, so a walk across it sees the list move.
 
 ## Faults
 
@@ -45,6 +46,7 @@ Not covered yet: the 509 image, quota and GP texts, the log-on page, the "no H@H
 | `DELETE /__mock/faults` | removes all rules |
 | `GET /__mock/requests` | the upstream requests served so far |
 | `DELETE /__mock/requests` | clears that log |
+| `POST /__mock/toplists/recompute` | reorders every toplist, as `mock.recomputeToplists()` does |
 
 ## Run
 
