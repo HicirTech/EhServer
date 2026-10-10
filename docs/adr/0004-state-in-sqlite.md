@@ -1,6 +1,6 @@
 # ADR-0004: State in SQLite
 
-- Status: Proposed
+- Status: Accepted (maintainer, 2026-10-11), after the first tables were built on it.
 
 ## Context
 
@@ -13,9 +13,10 @@ Cooldowns, budgets, jobs and account state must survive restarts ([nfr.md](../nf
   - egress state, cooldowns and budgets;
   - jobs, steps and events;
   - idempotency keys;
+  - toplist snapshots ([ADR-0010](0010-complete-toplists.md));
   - cache metadata and the sample index.
 - Library files live on disk under the library root ([ADR-0007](0007-library-format.md)). The database holds only their index.
-- Schema changes are numbered migrations. They run at start-up inside a transaction and have tests.
+- Schema changes are numbered migrations. They run at start-up, each inside its own transaction together with SQLite's `user_version`, and have tests. A database at a newer version than the server knows is refused.
 
 ## Consequences
 
