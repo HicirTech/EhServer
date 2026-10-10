@@ -1,6 +1,6 @@
 # ADR-0005: One governor for all upstream traffic
 
-- Status: Proposed
+- Status: Accepted in part (maintainer, 2026-10-10): one account per egress by default. The rest is Proposed.
 
 ## Context
 
