@@ -226,7 +226,8 @@ export function readCommentPosted(header: string | undefined, author: string): s
   return readCommentTime(posted);
 }
 
-export function readScore(text: string | undefined): number | null {
+/** A comment score such as `+12`, or a tag weight such as `-5`. */
+export function readSignedInteger(text: string | undefined): number | null {
   const value = normalizeSpace(text ?? "");
   return /^[+-]?\d+$/.test(value) ? Number(value) : null;
 }
