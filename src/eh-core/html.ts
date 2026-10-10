@@ -1,7 +1,7 @@
 /** HTML access for eh-core: htmlparser2 with css-select (ADR-0009). */
 import { selectAll, selectOne } from "css-select";
 import { type AnyNode, type ChildNode, type Document, type Element, isTag } from "domhandler";
-import { getAttributeValue, textContent } from "domutils";
+import { getAttributeValue, nextElementSibling, textContent } from "domutils";
 import { parseDocument } from "htmlparser2";
 
 export type { Document, Element };
@@ -17,6 +17,11 @@ export function find(selector: string, root: AnyNode): Element | null {
 
 export function findAll(selector: string, root: AnyNode): Element[] {
   return selectAll<AnyNode, Element>(selector, root);
+}
+
+/** The element right after this one, skipping text between them. */
+export function nextElement(element: Element): Element | null {
+  return nextElementSibling(element);
 }
 
 /** All text inside the element, entities decoded. */

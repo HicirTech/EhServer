@@ -12,6 +12,7 @@ import {
   readRatingValue,
   readTag,
 } from "./decoders";
+import { asString, excerpt, isJsonObject, type JsonObject, parseJsonObject } from "./json";
 import {
   assembling,
   type Failure,
@@ -67,15 +68,13 @@ const TokenPattern = /^[0-9a-f]{10}$/;
 const TorrentHashPattern = /^[0-9a-f]{40}$/;
 const KeyErrorPrefix = "Key missing, or incorrect key provided.";
 
-type Json = Readonly<Record<string, unknown>>;
-
 export function parseGdata(
   body: string,
   requested: readonly GalleryRef[],
 ): ParseResult<GdataReading> {
   const answer = parseJsonObject(body);
   if (answer === null) {
-    return unrecognized("gdata: JSON object", body.slice(0, 120));
+    return unrecognized("gdata: JSON object", excerpt(body));
   }
 
   if (typeof answer.error === "string") {
@@ -84,10 +83,10 @@ export function parseGdata(
 
   const entries = answer.gmetadata;
   if (!Array.isArray(entries)) {
-    return unrecognized("gdata: gmetadata", body.slice(0, 120));
+    return unrecognized("gdata: gmetadata", excerpt(body));
   }
 
-  const byGid = new Map<number, Json>();
+  const byGid = new Map<number, JsonObject>();
   for (const entry of entries) {
     const gid = isJsonObject(entry) ? readIntegerValue(entry.gid) : null;
     if (gid !== null && isJsonObject(entry)) {
@@ -101,7 +100,7 @@ export function parseGdata(
   return success({ items });
 }
 
-function readItem(entry: Json | undefined, ref: GalleryRef): GdataItem {
+function readItem(entry: JsonObject | undefined, ref: GalleryRef): GdataItem {
   if (entry === undefined) {
     return unrecognized("gdata: gmetadata[gid]", String(ref.gid));
   }
@@ -117,7 +116,7 @@ function readItem(entry: Json | undefined, ref: GalleryRef): GdataItem {
   return isUnrecognized(gallery) ? gallery : success(gallery);
 }
 
-function readGallery(entry: Json, ref: GalleryRef): GdataGallery {
+function readGallery(entry: JsonObject, ref: GalleryRef): GdataGallery {
   const field = <T>(name: string, decode: (value: unknown) => T | null): T =>
     need(decode(entry[name]), `gdata: ${name}`, JSON.stringify(entry[name]));
   need(entry.token === ref.token ? entry.token : null, "gdata: token", String(entry.token));
@@ -165,7 +164,7 @@ function readTorrent(value: unknown): GdataTorrent {
 }
 
 /** Each link is present only for galleries that have it. */
-function readLineage(entry: Json): GdataGallery["lineage"] {
+function readLineage(entry: JsonObject): GdataGallery["lineage"] {
   const parent = readLink(entry, "parent");
   const first = readLink(entry, "first");
   const current = readLink(entry, "current");
@@ -176,7 +175,7 @@ function readLineage(entry: Json): GdataGallery["lineage"] {
   };
 }
 
-function readLink(entry: Json, prefix: string): GalleryRef | null {
+function readLink(entry: JsonObject, prefix: string): GalleryRef | null {
   const gidValue = entry[`${prefix}_gid`];
   const keyValue = entry[`${prefix}_key`];
   if (gidValue === undefined && keyValue === undefined) {
@@ -191,21 +190,4 @@ function readLink(entry: Json, prefix: string): GalleryRef | null {
       JSON.stringify(keyValue),
     ),
   };
-}
-
-function parseJsonObject(body: string): Json | null {
-  try {
-    const value: unknown = JSON.parse(body);
-    return isJsonObject(value) ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-function isJsonObject(value: unknown): value is Json {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function asString(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
 }

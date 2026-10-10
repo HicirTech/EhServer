@@ -37,7 +37,7 @@ describe("parseGalleryPage", () => {
       visible: true,
       fileCount: 24,
       favoritedCount: 57,
-      rating: { average: 4.46, count: 189 },
+      rating: { average: 4.12, count: 73 },
       tags: [
         { namespace: "language", name: "english" },
         { namespace: "language", name: "translated" },

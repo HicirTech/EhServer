@@ -80,8 +80,8 @@ export function detailPage(overrides: Partial<DetailPage> = {}): DetailPage {
     fileSize: "12.5 MiB",
     length: 24,
     favorited: "57 times",
-    ratingAverage: "4.46",
-    ratingCount: 189,
+    ratingAverage: "4.12",
+    ratingCount: 73,
     tags: [
       { namespace: "language", names: ["english", "translated"] },
       { namespace: "female", names: ["sample tag"] },
