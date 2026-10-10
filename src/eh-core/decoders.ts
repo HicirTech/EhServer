@@ -161,7 +161,23 @@ export function readScriptVariables(
     : { gid, token, apiuid: Number(apiuid) };
 }
 
-/** "Average: 4.46" is a rating; "Not Yet Rated" is the page saying there is none. */
+/** A single page writes its variables without spaces: `var startkey="…";`. */
+export function readSinglePageVariables(script: string): {
+  readonly gid: number;
+  readonly number: number;
+  readonly pageToken: string;
+  readonly showkey: string;
+} | null {
+  const gid = readInteger(/\bvar gid=(\d+);/.exec(script)?.[1]);
+  const number = readInteger(/\bvar startpage=(\d+);/.exec(script)?.[1]);
+  const pageToken = /\bvar startkey="([0-9a-f]{10})";/.exec(script)?.[1];
+  const showkey = /\bvar showkey="([0-9a-z]+)";/.exec(script)?.[1];
+  return gid === null || number === null || pageToken === undefined || showkey === undefined
+    ? null
+    : { gid, number, pageToken, showkey };
+}
+
+/** "Average: 4.12" is a rating; "Not Yet Rated" is the page saying there is none. */
 export function readRatingAverage(text: string | undefined): number | "notRated" | null {
   const value = normalizeSpace(text ?? "");
   if (value === "Not Yet Rated") {

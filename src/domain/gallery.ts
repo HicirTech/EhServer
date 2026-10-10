@@ -22,6 +22,13 @@ export interface GalleryRef {
   readonly token: string;
 }
 
+/** A page of a gallery. Page numbers start at 1; the page token is the page's upstream access key. */
+export interface PageRef {
+  readonly gid: number;
+  readonly number: number;
+  readonly pageToken: string;
+}
+
 /** Namespaces are open: E-Hentai adds them. */
 export interface Tag {
   readonly namespace: string;

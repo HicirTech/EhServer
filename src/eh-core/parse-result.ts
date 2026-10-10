@@ -7,6 +7,7 @@ export type FailureCode =
   | "upstream_unavailable"
   | "too_fast_warning"
   | "ip_banned"
+  | "quota_exhausted"
   | "sad_panda"
   | "gallery_removed"
   | "gallery_unavailable"

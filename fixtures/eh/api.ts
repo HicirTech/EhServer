@@ -78,3 +78,62 @@ export function gdataErrorEntry(
 export function gdataJson(entries: readonly (GdataEntry | GdataErrorEntry)[]): string {
   return JSON.stringify({ gmetadata: entries });
 }
+
+/** A `showpage` answer in the keys a 2019 capture has; the original link sits in `i6` since 2023-10. */
+export interface ShowpageAnswer {
+  readonly gid: number;
+  readonly galleryToken: string;
+  readonly number: number;
+  readonly pageToken: string;
+  readonly imageUrl: string;
+  readonly reloadKey: string;
+  readonly width: number;
+  readonly height: number;
+  readonly originalIn: "i6" | "i7" | null;
+  readonly originalKey: string;
+}
+
+export function showpageAnswer(overrides: Partial<ShowpageAnswer> = {}): ShowpageAnswer {
+  return {
+    gid: 9000001,
+    galleryToken: "a1b2c3d4e5",
+    number: 3,
+    pageToken: "0a0a0a0a03",
+    imageUrl:
+      "http://198.51.100.7:2688/h/0123456789abcdef0123456789abcdef01234567-345678-1280-1810-jpg/keystamp=1788265440-0a1b2c3d4e;fileindex=1234567;xres=1280/sample_003.jpg",
+    reloadKey: "12345-678901",
+    width: 1280,
+    height: 1810,
+    originalIn: "i6",
+    originalKey: "0a1b2c3d4e5",
+    ...overrides,
+  };
+}
+
+export function showpageJson(overrides: Partial<ShowpageAnswer> = {}): string {
+  const answer = showpageAnswer(overrides);
+  const site = "https://e-hentai.org/";
+  const original = `<img src="https://ehgt.org/g/mr.gif" class="mr" /> <a href="${site}fullimg.php?gid=${answer.gid}&amp;page=${answer.number}&amp;key=${answer.originalKey}">Download original 2560 x 3620 2.4 MB source</a>`;
+  const next = `${site}s/0a0a0a0a04/${answer.gid}-${answer.number + 1}`;
+  return JSON.stringify({
+    p: answer.number,
+    s: `s/${answer.pageToken}/${answer.gid}-${answer.number}`,
+    n: `<div class="sn"><a id="next" onclick="return load_image(${answer.number + 1}, '0a0a0a0a04')" href="${next}"><img src="https://ehgt.org/g/n.png" /></a></div>`,
+    i: `<div>sample_003.jpg :: ${answer.width} x ${answer.height} :: 337.6 KB</div>`,
+    k: answer.pageToken,
+    i3: `<a onclick="return load_image(${answer.number + 1}, '0a0a0a0a04')" href="${next}"><img id="img" src="${answer.imageUrl}" style="width:${answer.width}px;height:${answer.height}px" onerror="this.onerror=null; nl('${answer.reloadKey}')" /></a>`,
+    i5: `<div class="sb"><a href="${site}g/${answer.gid}/${answer.galleryToken}/"><img src="https://ehgt.org/g/b.png" referrerpolicy="no-referrer" /></a></div>`,
+    i6: ` &nbsp; <img src="https://ehgt.org/g/mr.gif" class="mr" /> <a href="${site}?f_shash=0123456789abcdef0123456789abcdef01234567">Show all galleries with this file</a>${answer.originalIn === "i6" ? ` &nbsp; ${original}` : ""} &nbsp; <img src="https://ehgt.org/g/mr.gif" class="mr" /> <a href="#" id="loadfail" onclick="return nl('${answer.reloadKey}')">Click here if the image fails loading</a>`,
+    i7: answer.originalIn === "i7" ? ` &nbsp; ${original}` : null,
+    si: 12345,
+    x: String(answer.width),
+    y: String(answer.height),
+  });
+}
+
+/** A `gtoken` answer: one item per requested page, a gallery token or the site's error. */
+export function gtokenJson(
+  items: readonly ({ readonly gid: number; readonly token: string } | { readonly error: string })[],
+): string {
+  return JSON.stringify({ tokenlist: items });
+}
