@@ -11,13 +11,17 @@ import { parseArgs } from "node:util";
 
 import { readScriptVariables, readSinglePageVariables } from "../src/eh-core/decoders";
 import { classifyEnvelope } from "../src/eh-core/envelope";
+import { parseFavoritesPage } from "../src/eh-core/favorites-page";
 import { parseGalleryPage } from "../src/eh-core/gallery-page";
 import { parseHomePage } from "../src/eh-core/home-page";
 import type { ParseResult } from "../src/eh-core/parse-result";
 import { parseSearchPage } from "../src/eh-core/search-page";
 import { parseSinglePage } from "../src/eh-core/single-page";
+import { parseWatchedTagsPage } from "../src/eh-core/watched-tags-page";
 
 const DefaultRuns = 10;
+/** "Show All Favorites", then folders 0 to 9. */
+const FavoriteSlots = [null, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 function describe<T>(result: ParseResult<T, string>, count: (value: T) => string): string {
   switch (result.kind) {
@@ -72,7 +76,18 @@ function checkPage(html: string, runs: number) {
       (value) => `image ${value.image.file.width}px`,
     ),
     home: describe(parseHomePage(html), (value) => `${value.mode} limit`),
+    favorites: describe(
+      parseFavoritesCapture(html),
+      (value) => `${value.folders.length} folders, ${value.entries.length} entries`,
+    ),
+    watchedTags: describe(parseWatchedTagsPage(html), (value) => `${value.tags.length} tags`),
   };
+}
+
+/** A captured favourites page shows one folder or all of them: the first view it reads as. */
+function parseFavoritesCapture(html: string) {
+  const results = FavoriteSlots.map((slot) => parseFavoritesPage(html, slot));
+  return results.find((result) => result.kind !== "unrecognized") ?? parseFavoritesPage(html, null);
 }
 
 async function main(): Promise<void> {

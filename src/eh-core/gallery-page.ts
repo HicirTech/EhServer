@@ -13,9 +13,9 @@ import {
   readPageCount,
   readPreviewLink,
   readRatingAverage,
-  readScore,
   readScriptVariables,
   readShowing,
+  readSignedInteger,
   readSiteTime,
   readTorrentCount,
   readVisible,
@@ -244,7 +244,7 @@ function readComment(comment: Element): CommentReading {
     postedAt: need(readCommentPosted(header, author), "div.c3", header),
     editedAt:
       edited === null ? null : need(readCommentTime(text(edited)), "div.c8 strong", text(edited)),
-    score: isUploader ? null : need(readScore(scoreText), "div.c5 span", scoreText),
+    score: isUploader ? null : need(readSignedInteger(scoreText), "div.c5 span", scoreText),
     bodyText: (body === null ? "" : textWithBreaks(body.children))
       .split("\n")
       .map(normalizeSpace)

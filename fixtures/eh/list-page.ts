@@ -37,7 +37,7 @@ export interface ListPage {
   readonly nextGid: number | null;
 }
 
-interface ModeShape {
+export interface ModeShape {
   /** The value of the display-mode select, and the container `.itg` with its classes. */
   readonly selectValue: string;
   readonly open: string;
@@ -89,6 +89,11 @@ const DisplayModes: Readonly<Record<DisplayMode, ModeShape>> = {
     renderRow: thumbnailRow,
   },
 };
+
+/** How a display mode prints the list, for pages that add to it. */
+export function displayModeShape(mode: DisplayMode): ModeShape {
+  return DisplayModes[mode];
+}
 
 export function galleryRow(overrides: Partial<GalleryRow> = {}): GalleryRow {
   return {
@@ -161,12 +166,13 @@ export function noWatchedTagsPageHtml(site: Site = "eh"): string {
 }
 
 /** The parts every mode prints, in its own arrangement. */
-function parts(row: GalleryRow, base: string) {
+export function galleryParts(row: GalleryRow, base: string) {
   const popup = `${base}gallerypopups.php?gid=${row.gid}&amp;t=${row.token}&amp;act=addfav`;
   const title = escapeHtml(row.title);
   const torrentsUrl = `${base}gallerytorrents.php?gid=${row.gid}&amp;t=${row.token}`;
   return {
     gallery: `${base}g/${row.gid}/${row.token}/`,
+    popup,
     title,
     posted: (id: string) =>
       `<div onclick="popUp('${popup}',675,415)" id="${id}_${row.gid}">${row.posted}</div>`,
@@ -189,24 +195,24 @@ function parts(row: GalleryRow, base: string) {
 }
 
 function minimalRow(row: GalleryRow, base: string): string {
-  const p = parts(row, base);
+  const p = galleryParts(row, base);
   return `<tr><td class="gl1m glcat">${categoryDiv(row.category, "cs", base)}</td><td class="gl2m"><div class="glcut" id="ic${row.gid}"></div><div class="glthumb" id="it${row.gid}" style="top:-22px;height:400px"><div>${p.image}</div><div><div>${categoryDiv(row.category, "cs", base)}${p.posted("postedpop")}</div><div>${p.stars}<div>${row.pages} pages</div></div></div></div>${p.posted("posted")}</td><td class="gl6m"><div class="gldown">${p.torrent}</div></td><td class="gl3m glname"><a href="${p.gallery}"><div class="glink">${p.title}</div></a></td><td class="gl4m">${p.stars}</td><td class="gl5m glhide"><div>${p.uploader}</div></td></tr>`;
 }
 
 function compactRow(row: GalleryRow, base: string): string {
-  const p = parts(row, base);
+  const p = galleryParts(row, base);
   return `<tr><td class="gl1c glcat">${categoryDiv(row.category, "cn", base)}</td><td class="gl2c"><div class="glcut" id="ic${row.gid}"></div><div class="glthumb" id="it${row.gid}" style="top:-22px;height:400px"><div>${p.image}</div><div><div>${categoryDiv(row.category, "cn", base)}${p.posted("postedpop")}</div><div>${p.stars}<div>${row.pages} pages</div></div></div></div><div>${p.posted("posted")}${p.stars}<div class="gldown">${p.torrent}</div></div></td><td class="gl3c glname" onmouseover="show_image_pane(${row.gid});preload_pane_image(0,${row.gid})" onmouseout="hide_image_pane(${row.gid})"><a href="${p.gallery}"><div class="glink">${p.title}</div><div>${p.tags}</div></a></td><td class="gl4c glhide"><div>${p.uploader}</div><div>${row.pages} pages</div></td></tr>`;
 }
 
 /** The nested tag table omits `</tr>`, as the captured page does. */
 function extendedRow(row: GalleryRow, base: string): string {
-  const p = parts(row, base);
+  const p = galleryParts(row, base);
   const tagTable = `<table><tr><td class="tc">misc:</td><td>${p.tags}</td></table>`;
   return `<tr><td class="gl1e" style="width:250px"><div style="height:354px;width:250px"><a href="${p.gallery}">${p.image}</a></div></td><td class="gl2e"><div><div class="gl3e">${categoryDiv(row.category, "cn", base)}${p.posted("posted")}${p.stars}<div>${p.uploader}</div><div>${row.pages} pages</div><div class="gldown">${p.torrent}</div></div><a href="${p.gallery}"><div class="gl4e glname"><div class="glink">${p.title}</div><div>${tagTable}</div></div></a></div></td></tr>`;
 }
 
 function thumbnailRow(row: GalleryRow, base: string): string {
-  const p = parts(row, base);
+  const p = galleryParts(row, base);
   return `<div class="gl1t"><a href="${p.gallery}"><div class="gl4t glname">${p.title}</div></a><div class="gl3t" style="height:354px;width:250px"><a href="${p.gallery}">${p.image}</a></div><div class="gl5t"><div>${categoryDiv(row.category, "cs", base)}${p.posted("posted")}</div><div>${p.stars}<div>${row.pages} pages</div><div class="gldown">${p.torrent}</div></div></div></div>`;
 }
 
