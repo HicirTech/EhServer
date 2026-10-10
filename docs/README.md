@@ -9,6 +9,7 @@ EhServer is a generic, self-hosted HTTP API over the E-Hentai domain. These docu
 | [Outcome catalog](outcomes.md) | Proposed | How every upstream response is classified, and what happens next |
 | [Non-functional requirements](nfr.md) | Proposed | Quality bar, requirements, hazards and controls |
 | [API contract](../api/openapi.yaml) | Draft | `/api/v1` in OpenAPI 3.1 |
+| [Dependencies](dependencies.md) | Draft | Third-party packages, pinned versions and reasons |
 
 Statuses: **Accepted** means decided by the maintainer; **Proposed** means written for review; **Open** means not decided; **Draft** means incomplete.
 
@@ -26,4 +27,4 @@ EhServer is released under the [MIT License](../LICENSE).
 | [0006](adr/0006-users-accounts-tokens.md) | Users, E-Hentai accounts and API tokens | Proposed |
 | [0007](adr/0007-library-format.md) | The library format | Proposed |
 | [0008](adr/0008-api-style.md) | REST with an OpenAPI contract, SSE for events | Accepted in principle |
-| [0009](adr/0009-html-parsing.md) | How HTML is parsed | Open |
+| [0009](adr/0009-html-parsing.md) | How HTML is parsed: htmlparser2 with css-select | Proposed |
