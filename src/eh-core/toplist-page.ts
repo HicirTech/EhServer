@@ -3,6 +3,7 @@
  * The heading names the toplist shown, which must be the one requested.
  */
 import type { GalleryRef } from "../domain/gallery";
+import type { ToplistPeriod } from "../domain/toplist";
 import { normalizeSpace, readInteger, readToplistLink } from "./decoders";
 import { attribute, type Element, find, findAll, parseHtml, text } from "./html";
 import { type ListedGallery, readListRows } from "./list-rows";
@@ -15,8 +16,6 @@ import {
   unrecognized,
 } from "./parse-result";
 import type { UpstreamRequest } from "./upstream-request";
-
-export type ToplistPeriod = "allTime" | "pastYear" | "pastMonth" | "yesterday";
 
 export interface ToplistEntryReading {
   readonly rank: number;

@@ -3,8 +3,9 @@
  * and a walk when there is none or it is stale. Walks start only on request, one per toplist at a
  * time, and wait before starting again after a walk was discarded or stopped.
  */
+
+import type { ToplistPeriod } from "../domain/toplist";
 import type { UpstreamResponse } from "../eh-core/envelope";
-import type { ToplistPeriod } from "../eh-core/toplist-page";
 import type { UpstreamRequest } from "../eh-core/upstream-request";
 import { pageCooldownMs } from "../governor/page-cooldowns";
 import type { ToplistSnapshot, ToplistSnapshotStore } from "../store/toplist-snapshots";

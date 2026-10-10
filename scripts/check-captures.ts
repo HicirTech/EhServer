@@ -9,6 +9,7 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 
+import { ToplistPeriods } from "../src/domain/toplist";
 import { parseArchiveLocatingPage } from "../src/eh-core/archive-locating-page";
 import { type ArchiveOptionReading, parseArchiverPage } from "../src/eh-core/archiver-page";
 import {
@@ -24,13 +25,12 @@ import { attribute, find, parseHtml } from "../src/eh-core/html";
 import type { ParseResult } from "../src/eh-core/parse-result";
 import { parseSearchPage } from "../src/eh-core/search-page";
 import { parseSinglePage } from "../src/eh-core/single-page";
-import { parseGalleryToplistPage, type ToplistPeriod } from "../src/eh-core/toplist-page";
+import { parseGalleryToplistPage } from "../src/eh-core/toplist-page";
 import { parseWatchedTagsPage } from "../src/eh-core/watched-tags-page";
 
 const DefaultRuns = 10;
 /** "Show All Favorites", then folders 0 to 9. */
 const FavoriteSlots = [null, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-const ToplistPeriods: readonly ToplistPeriod[] = ["allTime", "pastYear", "pastMonth", "yesterday"];
 
 function describe<T>(result: ParseResult<T, string>, count: (value: T) => string): string {
   switch (result.kind) {

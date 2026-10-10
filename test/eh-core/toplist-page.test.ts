@@ -1,13 +1,9 @@
 /** Gallery toplists (nfr.md TEST-2: success and failure fixtures; REL-1 and H5). */
 import { describe, expect, test } from "bun:test";
-
 import { galleryRow, listPageHtml } from "../../fixtures/eh/list-page";
 import { galleryToplistPageHtml, toplistRow } from "../../fixtures/eh/toplist-page";
-import {
-  galleryToplistRequest,
-  parseGalleryToplistPage,
-  type ToplistPeriod,
-} from "../../src/eh-core/toplist-page";
+import type { ToplistPeriod } from "../../src/domain/toplist";
+import { galleryToplistRequest, parseGalleryToplistPage } from "../../src/eh-core/toplist-page";
 
 const Rows = [
   toplistRow({
