@@ -1,14 +1,19 @@
 import { detailPageHtml, errorBoxPageHtml } from "../fixtures/eh/detail-page";
 import { listPageHtml, noHitsPageHtml } from "../fixtures/eh/list-page";
 import type { Site } from "../fixtures/eh/page-shell";
+import { galleryToplistPageHtml, toplistRow } from "../fixtures/eh/toplist-page";
 import {
   catalogGids,
+  GalleryToplistNames,
   galleryPage,
   galleryToken,
   isCatalogGid,
   ListPageSize,
   listRow,
   matchesSearch,
+  ToplistPageSize,
+  toplistGids,
+  toplistScore,
 } from "./catalog";
 import { type FaultName, faultResponse, html, isFaultName, KeyMissingText } from "./faults";
 
@@ -41,16 +46,19 @@ export interface Mock {
   clearFaults(): void;
   requests(): readonly MockRequest[];
   clearRequests(): void;
+  /** Reorders every toplist, as the site's own recomputation does. */
+  recomputeToplists(): void;
   stop(): Promise<void>;
 }
 
 interface State {
   readonly rules: { rule: FaultRule; remaining: number }[];
   readonly log: MockRequest[];
+  toplistRecomputations: number;
 }
 
 export function startMock(port = 0): Mock {
-  const state: State = { rules: [], log: [] };
+  const state: State = { rules: [], log: [], toplistRecomputations: 0 };
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port,
@@ -62,6 +70,9 @@ export function startMock(port = 0): Mock {
     clearFaults: () => state.rules.splice(0),
     requests: () => [...state.log],
     clearRequests: () => state.log.splice(0),
+    recomputeToplists: () => {
+      state.toplistRecomputations++;
+    },
     stop: () => server.stop(true),
   };
 }
@@ -81,7 +92,9 @@ function handle(request: Request, state: State): Response | Promise<Response> {
   const path = `/${rest.join("/")}`;
   state.log.push({ method: request.method, host, path, query: url.search });
   const fault = takeFault(state, host, path);
-  return fault === undefined ? route(site, path, url.searchParams) : faultResponse(fault, request);
+  return fault === undefined
+    ? route(site, path, url.searchParams, state)
+    : faultResponse(fault, request);
 }
 
 function takeFault(state: State, host: string, path: string): FaultName | undefined {
@@ -103,9 +116,13 @@ function addFault(state: State, rule: FaultRule): void {
   state.rules.push({ rule, remaining: rule.times });
 }
 
-function route(site: Site, path: string, query: URLSearchParams): Response {
+function route(site: Site, path: string, query: URLSearchParams, state: State): Response {
   if (path === "/") {
     return listResponse(site, query);
+  }
+
+  if (path === "/toplist.php" && site === "eh") {
+    return toplistResponse(query, state.toplistRecomputations);
   }
 
   const gallery = /^\/g\/(\d+)\/([0-9a-f]{10})\/$/.exec(path);
@@ -114,6 +131,29 @@ function route(site: Site, path: string, query: URLSearchParams): Response {
   }
 
   return new Response("Not Found", { status: 404 });
+}
+
+/** Galleries toplists only; `p` counts pages from 0, and the first page goes without it. */
+function toplistResponse(query: URLSearchParams, recomputations: number): Response {
+  const code = Number(query.get("tl"));
+  const name = GalleryToplistNames[code];
+  const gids = toplistGids(code, recomputations);
+  const pageCount = Math.ceil(gids.length / ToplistPageSize);
+  const page = Number(query.get("p") ?? 0);
+  if (name === undefined || !Number.isInteger(page) || page < 0 || page >= pageCount) {
+    return new Response("Not Found", { status: 404 });
+  }
+
+  const first = page * ToplistPageSize;
+  const rows = gids.slice(first, first + ToplistPageSize).map((gid, index) => {
+    const rank = first + index + 1;
+    return toplistRow({
+      gallery: listRow(gid),
+      rank,
+      score: toplistScore(rank).toLocaleString("en-US"),
+    });
+  });
+  return html(galleryToplistPageHtml({ site: "eh", code, name, page, pageCount, rows }));
 }
 
 /** `next=<gid>` lists older galleries, `prev=<gid>` newer ones, newest first as the site does. */
@@ -185,6 +225,11 @@ async function control(request: Request, url: URL, state: State): Promise<Respon
 
   if (key === "DELETE /__mock/requests") {
     state.log.splice(0);
+    return new Response(null, { status: 204 });
+  }
+
+  if (key === "POST /__mock/toplists/recompute") {
+    state.toplistRecomputations++;
     return new Response(null, { status: 204 });
   }
 

@@ -7,6 +7,15 @@ export const FirstGid = 9000001;
 export const CatalogSize = 60;
 export const ListPageSize = 25;
 export const PreviewsPerPage = 20;
+export const ToplistPageSize = 50;
+
+/** The galleries toplists the mock serves, by `tl` code, named as the site names them. */
+export const GalleryToplistNames: Readonly<Record<number, string>> = {
+  11: "Galleries All-Time",
+  12: "Galleries Past Year",
+  13: "Galleries Past Month",
+  15: "Galleries Yesterday",
+};
 
 const Categories = [
   "Doujinshi",
@@ -50,6 +59,21 @@ export function galleryToken(gid: number): string {
 
 export function pageToken(gid: number, page: number): string {
   return sha1Hex(`page:${gid}:${page}`).slice(0, 10);
+}
+
+/**
+ * The catalogue ranked for toplist `code`, best first. Each recomputation moves every gallery up
+ * one place and the best one to the end, so a walk across a recomputation sees the list move.
+ */
+export function toplistGids(code: number, recomputations: number): number[] {
+  const gids = catalogGids();
+  const shift = (code + recomputations) % gids.length;
+  return [...gids.slice(shift), ...gids.slice(0, shift)];
+}
+
+/** Points fall by 1,000 a rank. */
+export function toplistScore(rank: number): number {
+  return (CatalogSize + 1 - rank) * 1000;
 }
 
 /** The whole search text is one phrase, looked for in the title and in each tag. */
