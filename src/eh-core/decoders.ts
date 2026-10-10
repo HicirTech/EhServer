@@ -56,6 +56,13 @@ const SecondsPerUnit: Readonly<Record<string, number>> = {
   second: 1,
 };
 
+const BytesPerUnit: Readonly<Record<string, number>> = {
+  KiB: 1024,
+  MiB: 1024 ** 2,
+  GiB: 1024 ** 3,
+  TiB: 1024 ** 4,
+};
+
 /** Collapses runs of whitespace, NBSP included, the way a browser renders the text. */
 export function normalizeSpace(text: string): string {
   return text.replace(/\s+/g, " ").trim();
@@ -173,6 +180,43 @@ export function readToplistLink(
   const code = readInteger(match?.[1]);
   const page = match?.[2] === undefined ? 0 : readInteger(match[2]);
   return code === null || page === null ? null : { code, page };
+}
+
+/** An archiver form: `archiver.php?gid=<gid>&token=<token>`, on some pages with `&or=<key>`. */
+export function readArchiverLink(href: string | undefined): GalleryRef | null {
+  const match = /\/archiver\.php\?gid=(\d+)&token=([0-9a-f]{10})(?:&or=[^&]+)?$/.exec(href ?? "");
+  const gid = readInteger(match?.[1]);
+  return gid === null || match?.[2] === undefined ? null : { gid, token: match[2] };
+}
+
+/** Where the archiver sends the browser: `https://<server>/archive/…`. */
+export function readArchiveUrl(href: string | undefined): string | null {
+  return href !== undefined && /^https:\/\/[0-9a-z.-]+\/archive\/\S+$/.test(href) ? href : null;
+}
+
+/** An archive's cost: `Free!`, or `1,234 GP`. */
+export function readGpCost(text: string | undefined): number | null {
+  const value = normalizeSpace(text ?? "");
+  return value === "Free!" ? 0 : readInteger(/^([\d,]+) GP$/.exec(value)?.[1]);
+}
+
+/** A size as the site rounds it, such as `24.68 MiB`, in bytes. */
+export function readFileSize(text: string | undefined): number | null {
+  const match = /^(\d+(?:\.\d+)?) ([KMGT]iB)$/.exec(normalizeSpace(text ?? ""));
+  const unit = BytesPerUnit[match?.[2] ?? ""];
+  return match?.[1] === undefined || unit === undefined
+    ? null
+    : Math.round(Number(match[1]) * unit);
+}
+
+/** The account's funds as the archiver shows them: `1,234 GP [?] 5,678 Credits [?]`. */
+export function readGpAndCredits(
+  text: string | undefined,
+): { readonly gp: number; readonly credits: number } | null {
+  const match = /^([\d,]+) GP \[\?\] ([\d,]+) Credits \[\?\]$/.exec(normalizeSpace(text ?? ""));
+  const gp = readInteger(match?.[1]);
+  const credits = readInteger(match?.[2]);
+  return gp === null || credits === null ? null : { gp, credits };
 }
 
 /** `Found 1,234 results.` states a total; `Found thousands of results.` does not. */

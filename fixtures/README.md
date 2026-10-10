@@ -22,5 +22,7 @@ A builder is a claim about the shape of a real page. Each one names the capture 
 | `watchedTagsPageHtml` | a My Tags page captured on ExHentai in 2022-01, with one tag set whose tags are all watched; hidden tags, a set colour and an empty tag set are **unconfirmed** |
 | `logOnPageHtml` | **unconfirmed**: only the paragraph `This page requires you to log on.` is known |
 | `galleryToplistPageHtml` | galleries toplists captured in 2023 (all-time) and 2024-04 (yesterday): Compact rows behind a rank-and-score cell, with page-number paging. Whether a toplist follows the account's display mode is **unconfirmed** |
+| `archiverPageHtml` | the archiver captured on ExHentai in 2024-04, with both archives free; the funds, a GP cost, sizes in GiB and a resample that is not offered follow an E-Hentai page captured by 2025-06. **Unconfirmed**: an original that is not offered, and costs in other words, such as `Insufficient Funds` |
+| `archiveLocatingPageHtml` | the archiver's answer to a download request, captured on ExHentai by 2021-01 and on E-Hentai by 2025-06 |
 
 Where a builder and a newer real page disagree, the real page wins, and the builder changes in the same piece of work.
