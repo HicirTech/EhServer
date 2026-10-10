@@ -76,7 +76,18 @@ Scope is what the server action applies to: the request, the job, the account or
 | `upstream_unrecognized` | unrecognized | nothing matched | request and job | fail; keep a sample; alert; pause the job | 502 | `retry_after` |
 | `write_unconfirmed` | unconfirmed | the read-back did not confirm the write | request | do not resend | 502 | `retry_same_key` |
 
-EhServer's own conditions use ordinary statuses: 400 for an invalid request, 401 for a missing or bad token, 403 for a missing scope, 404 for an unknown resource, 429 when a client exceeds EhServer's own limits, and 501 for a toplist type that is not served yet ([ADR-0010](adr/0010-complete-toplists.md)).
+EhServer's own conditions use ordinary statuses, with these codes:
+
+| Code | Condition | API status | Client action |
+|---|---|---|---|
+| `invalid_request` | a parameter is missing or not one of its values | 400 | `give_up` |
+| `unauthorized` | the token is missing or bad | 401 | `user_action` |
+| `forbidden` | the token lacks the scope | 403 | `user_action` |
+| `not_found` | no such resource | 404 | `give_up` |
+| `method_not_allowed` | the resource does not take that method | 405 | `give_up` |
+| `client_rate_limited` | the client exceeds EhServer's own limits | 429 | `retry_after` |
+| `internal_error` | a fault in EhServer itself | 500 | `give_up` |
+| `not_implemented` | a toplist type that is not served yet ([ADR-0010](adr/0010-complete-toplists.md)) | 501 | `give_up` |
 
 ## 5. Problem response
 

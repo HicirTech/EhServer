@@ -18,6 +18,10 @@ export const SitePagePacing: Pacing = { minGapMs: 3_000, maxGapMs: 6_000 };
 /** The mock is not the site, so nothing needs protecting. */
 export const MockPagePacing: Pacing = { minGapMs: 0, maxGapMs: 0 };
 
+export function averageGapSeconds(pacing: Pacing): number {
+  return (pacing.minGapMs + pacing.maxGapMs) / 2 / 1000;
+}
+
 export interface Clock {
   now(): number;
   sleep(ms: number): Promise<void>;

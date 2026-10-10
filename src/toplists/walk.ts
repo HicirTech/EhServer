@@ -2,6 +2,7 @@
  * Reads a galleries toplist whole (ADR-0010): every page in order, then the first and the last page
  * again. A page that cannot be read ends the walk with the reason; the caller decides when to retry.
  */
+import type { ToplistPeriod } from "../domain/toplist";
 import { classifyEnvelope, type UpstreamResponse } from "../eh-core/envelope";
 import type { Failure, Unrecognized } from "../eh-core/parse-result";
 import {
@@ -9,7 +10,6 @@ import {
   galleryToplistRequest,
   parseGalleryToplistPage,
   type ToplistEntryReading,
-  type ToplistPeriod,
 } from "../eh-core/toplist-page";
 import { assembleToplistWalk } from "../eh-core/toplist-walk";
 import type { UpstreamRequest } from "../eh-core/upstream-request";

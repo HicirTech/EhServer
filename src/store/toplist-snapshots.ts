@@ -1,7 +1,8 @@
 /** Toplist snapshots (ADR-0010): one per toplist, replaced whole by the next complete walk. */
 import type { Database } from "bun:sqlite";
 
-import type { ToplistEntryReading, ToplistPeriod } from "../eh-core/toplist-page";
+import type { ToplistPeriod } from "../domain/toplist";
+import type { ToplistEntryReading } from "../eh-core/toplist-page";
 
 export interface ToplistSnapshot {
   readonly period: ToplistPeriod;
