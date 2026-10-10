@@ -27,4 +27,4 @@ EhServer is released under the [MIT License](../LICENSE).
 | [0006](adr/0006-users-accounts-tokens.md) | Users, E-Hentai accounts and API tokens | Proposed |
 | [0007](adr/0007-library-format.md) | The library format | Proposed |
 | [0008](adr/0008-api-style.md) | REST with an OpenAPI contract, SSE for events | Accepted in principle |
-| [0009](adr/0009-html-parsing.md) | How HTML is parsed: htmlparser2 with css-select | Proposed |
+| [0009](adr/0009-html-parsing.md) | How HTML is parsed: htmlparser2 with css-select | Accepted |

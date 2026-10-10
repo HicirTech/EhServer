@@ -7,7 +7,7 @@ Two implementations of the same two parsers, a compact-mode search page and a ga
 | `dom/` | htmlparser2 and css-select |
 | `rewriter/` | Bun's `HTMLRewriter`, decoding entities with `entities` |
 
-Both only collect strings (`raw.ts`). The shared `assemble-list.ts` and `assemble-detail.ts` turn them into readings through the decoders in `decoders.ts`, so the two folders differ only in how they reach the HTML. Results and the recommendation are in [ADR-0009](../../docs/adr/0009-html-parsing.md).
+Both only collect strings (`raw.ts`). The shared `assemble-list.ts` and `assemble-detail.ts` turn them into readings through the decoders in `decoders.ts`, so the two folders differ only in how they reach the HTML. Results and the decision are in [ADR-0009](../../docs/adr/0009-html-parsing.md).
 
 ## Run
 
