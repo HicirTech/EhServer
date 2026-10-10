@@ -12,6 +12,8 @@ EhServer is a generic, self-hosted HTTP API over the E-Hentai domain. These docu
 
 Statuses: **Accepted** means decided by the maintainer; **Proposed** means written for review; **Open** means not decided; **Draft** means incomplete.
 
+EhServer is released under the [MIT License](../LICENSE).
+
 ## Architecture decisions
 
 | ADR | Decision | Status |
