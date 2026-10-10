@@ -9,10 +9,9 @@ Runtime: Bun 1.4.2 (`engines` in `package.json`; CI pins the same version).
 | typescript | 7.0.2 | development | Type checking; Bun only strips types | Apache-2.0 |
 | @biomejs/biome | 2.5.14 | development | Formatter and linter | MIT or Apache-2.0 |
 | @types/bun | 1.4.2 | development | Bun's type definitions, matching the runtime | MIT |
-| htmlparser2 | 12.0.0 | spike | HTML parsing for [ADR-0009](adr/0009-html-parsing.md) | MIT |
-| css-select | 7.0.0 | spike | CSS selectors over the htmlparser2 tree | BSD-2-Clause |
-| domhandler | 6.0.1 | spike | The node types htmlparser2 builds | BSD-2-Clause |
-| domutils | 4.0.2 | spike | Text and attribute helpers for those nodes | BSD-2-Clause |
-| entities | 8.1.0 | spike | Decodes entities for the `HTMLRewriter` variant | BSD-2-Clause |
+| htmlparser2 | 12.0.0 | runtime | `eh-core` parses HTML with it ([ADR-0009](adr/0009-html-parsing.md)) | MIT |
+| css-select | 7.0.0 | runtime | CSS selectors over the htmlparser2 tree | BSD-2-Clause |
+| domhandler | 6.0.1 | runtime | The node types htmlparser2 builds | BSD-2-Clause |
+| domutils | 4.0.2 | runtime | Text and attribute helpers for those nodes | BSD-2-Clause |
 
-ADR-0009 is accepted. The spike packages stay development dependencies until `eh-core` starts; then htmlparser2, css-select, domhandler and domutils become runtime dependencies, and `entities` stays only as a dependency of htmlparser2.
+htmlparser2 brings `entities` 8.1.0 (BSD-2-Clause), which decodes HTML entities; `bun.lock` pins it with the rest.

@@ -4,14 +4,15 @@
   "workspaces": {
     "": {
       "name": "ehserver",
-      "devDependencies": {
-        "@biomejs/biome": "2.5.14",
-        "@types/bun": "1.4.2",
+      "dependencies": {
         "css-select": "7.0.0",
         "domhandler": "6.0.1",
         "domutils": "4.0.2",
-        "entities": "8.1.0",
         "htmlparser2": "12.0.0",
+      },
+      "devDependencies": {
+        "@biomejs/biome": "2.5.14",
+        "@types/bun": "1.4.2",
         "typescript": "7.0.2",
       },
     },
