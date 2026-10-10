@@ -1,0 +1,1911 @@
+openapi: 3.1.0
+info:
+  title: EhServer API
+  version: 0.1.0-draft
+  summary: A generic, self-hosted HTTP API over the E-Hentai domain.
+  description: |
+    Draft contract. The design behind it is in docs/: domain-model.md (entities),
+    outcomes.md (errors and actions), nfr.md and the ADRs.
+
+    Every response carries `X-Request-Id` and `Server-Timing`. Errors are
+    `application/problem+json` with a stable `code` from docs/outcomes.md.
+    Writes take an `Idempotency-Key` header and return only after a read-back
+    confirmed them.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: operations
+  - name: discovery
+  - name: galleries
+  - name: account
+  - name: jobs
+  - name: library
+  - name: admin
+
+paths:
+  /meta:
+    get:
+      tags: [operations]
+      operationId: getMeta
+      summary: Server version and capabilities
+      security: []
+      responses:
+        '200':
+          description: Version and capability flags.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meta'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /health:
+    get:
+      tags: [operations]
+      operationId: getHealth
+      summary: Liveness and readiness
+      security: []
+      responses:
+        '200':
+          description: The server is ready.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /egress:
+    get:
+      tags: [operations]
+      operationId: listEgress
+      summary: Egress states
+      responses:
+        '200':
+          description: Every egress with its state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Egress'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /galleries:
+    get:
+      tags: [discovery]
+      operationId: searchGalleries
+      summary: Search or list galleries
+      description: Results depend on the account's filters, so they are account-scoped.
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: categories
+          in: query
+          description: Categories to include. All when absent.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/Category'
+        - name: advanced
+          in: query
+          description: Advanced search switches.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/AdvancedSearchOption'
+        - name: minRating
+          in: query
+          schema:
+            type: integer
+            minimum: 2
+            maximum: 5
+        - name: pagesFrom
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: pagesTo
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: One page of results.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchPage'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /image-search:
+    post:
+      tags: [discovery]
+      operationId: searchByImage
+      summary: Search galleries by an image
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                similar:
+                  type: boolean
+                coversOnly:
+                  type: boolean
+                showExpunged:
+                  type: boolean
+      responses:
+        '200':
+          description: Matching galleries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchPage'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /toplists/{type}:
+    get:
+      tags: [discovery]
+      operationId: getToplist
+      summary: A toplist
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ToplistType'
+        - name: period
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/ToplistPeriod'
+      responses:
+        '200':
+          description: The ranked entries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Toplist'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /galleries/{gid}:
+    get:
+      tags: [galleries]
+      operationId: getGallery
+      summary: A gallery (global facts only)
+      parameters:
+        - $ref: '#/components/parameters/Gid'
+        - $ref: '#/components/parameters/Token'
+      responses:
+        '200':
+          description: The gallery.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Gallery'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /galleries/{gid}/state:
+    get:
+      tags: [galleries]
+      operationId: getGalleryUserState
+      summary: The account's state for a gallery
+      parameters:
+        - $ref: '#/components/parameters/Gid'
+        - $ref: '#/components/parameters/Token'
+      responses:
+        '200':
+          description: Favourite, own rating and permissions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GalleryUserState'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /galleries/{gid}/favorite:
+    put:
+      tags: [galleries]
+      operationId: setFavorite
+      summary: Add a gallery to a favourite folder, or move it
+      parameters:
+        - $ref: '#/components/parameters/Gid'
+        - $ref: '#/components/parameters/Token'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Favorite'
+      responses:
+        '200':
+          description: Confirmed by a read-back.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GalleryUserStateWrite'
+        default:
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [galleries]
+      operationId: removeFavorite
+      summary: Remove a gallery from the favourites
+      parameters:
+        - $ref: '#/components/parameters/Gid'
+        - $ref: '#/components/parameters/Token'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Confirmed by a read-back.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GalleryUserStateWrite'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /galleries/{gid}/rating:
+    put:
+      tags: [galleries]
+      operationId: rateGallery
+      summary: Rate a gallery
+      parameters:
+        - $ref: '#/components/parameters/Gid'
+        - $ref: '#/components/parameters/Token'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating:
+                  type: number
+                  minimum: 0.5
+                  maximum: 5
+                  multipleOf: 0.5
+      responses:
+        '200':
+          description: Confirmed by a read-back.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GalleryUserStateWrite'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /galleries/{gid}/pages:
+    get:
+      tags: [galleries]
+      operationId: listPages
+      summary: The gallery's pages
+      parameters:
+        - $ref: '#/components/parameters/Gid'
+        - $ref: '#/components/parameters/Token'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: One page of the page list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageList'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /galleries/{gid}/pages/{number}/image:
+    get:
+      tags: [galleries]
+      operationId: getPageImage
+      summary: The image of one page
+      description: The server resolves and fetches the image; the client never contacts E-Hentai.
+      parameters:
+        - $ref: '#/components/parameters/Gid'
+        - $ref: '#/components/parameters/Token'
+        - $ref: '#/components/parameters/PageNumber'
+        - name: variant
+          in: query
+          schema:
+            type: string
+            enum: [resample, original]
+            default: resample
+      responses:
+        '200':
+          description: The image bytes.
+          headers:
+            X-Image-Sha1:
+              $ref: '#/components/headers/ImageSha1'
+            X-Image-Degraded:
+              $ref: '#/components/headers/ImageDegraded'
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /galleries/{gid}/thumbnail:
+    get:
+      tags: [galleries]
+      operationId: getThumbnail
+      summary: The gallery's cover thumbnail
+      parameters:
+        - $ref: '#/components/parameters/Gid'
+        - $ref: '#/components/parameters/Token'
+      responses:
+        '200':
+          description: The image bytes.
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /galleries/{gid}/comments:
+    get:
+      tags: [galleries]
+      operationId: listComments
+      summary: The gallery's comments
+      parameters:
+        - $ref: '#/components/parameters/Gid'
+        - $ref: '#/components/parameters/Token'
+      responses:
+        '200':
+          description: All comments.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentList'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      tags: [galleries]
+      operationId: postComment
+      summary: Post a comment
+      parameters:
+        - $ref: '#/components/parameters/Gid'
+        - $ref: '#/components/parameters/Token'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+      responses:
+        '201':
+          description: The comment, found again on the gallery page.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [comment, confirmation]
+                properties:
+                  comment:
+                    $ref: '#/components/schemas/Comment'
+                  confirmation:
+                    $ref: '#/components/schemas/Confirmation'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /galleries/{gid}/comments/{commentId}/vote:
+    put:
+      tags: [galleries]
+      operationId: voteComment
+      summary: Vote on a comment
+      parameters:
+        - $ref: '#/components/parameters/Gid'
+        - $ref: '#/components/parameters/Token'
+        - $ref: '#/components/parameters/CommentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vote]
+              properties:
+                vote:
+                  type: integer
+                  enum: [-1, 0, 1]
+      responses:
+        '200':
+          description: Confirmed by a read-back.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [state, confirmation]
+                properties:
+                  state:
+                    $ref: '#/components/schemas/CommentUserState'
+                  confirmation:
+                    $ref: '#/components/schemas/Confirmation'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /account:
+    get:
+      tags: [account]
+      operationId: getAccount
+      summary: The caller's E-Hentai account state
+      responses:
+        '200':
+          description: Session, site access and quota.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountState'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /favorites:
+    get:
+      tags: [account]
+      operationId: listFavoriteFolders
+      summary: The account's favourite folders
+      responses:
+        '200':
+          description: Ten folders.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    maxItems: 10
+                    items:
+                      $ref: '#/components/schemas/FavoriteFolder'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /favorites/{slot}:
+    get:
+      tags: [account]
+      operationId: listFavorites
+      summary: The galleries in one favourite folder
+      parameters:
+        - $ref: '#/components/parameters/Slot'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: One page of the folder.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FavoritePage'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /watched-tags:
+    get:
+      tags: [account]
+      operationId: listWatchedTags
+      summary: The account's watched and hidden tags
+      responses:
+        '200':
+          description: All entries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WatchedTag'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      tags: [account]
+      operationId: addWatchedTag
+      summary: Watch or hide a tag
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WatchedTagCreate'
+      responses:
+        '201':
+          description: Confirmed by a read-back.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tag, confirmation]
+                properties:
+                  tag:
+                    $ref: '#/components/schemas/WatchedTag'
+                  confirmation:
+                    $ref: '#/components/schemas/Confirmation'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /watched-tags/{id}:
+    delete:
+      tags: [account]
+      operationId: removeWatchedTag
+      summary: Stop watching or hiding a tag
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Confirmed by a read-back.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [confirmation]
+                properties:
+                  confirmation:
+                    $ref: '#/components/schemas/Confirmation'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /jobs:
+    get:
+      tags: [jobs]
+      operationId: listJobs
+      summary: The caller's jobs
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - name: state
+          in: query
+          schema:
+            $ref: '#/components/schemas/JobState'
+      responses:
+        '200':
+          description: One page of jobs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Job'
+                  next:
+                    $ref: '#/components/schemas/Cursor'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      tags: [jobs]
+      operationId: createJob
+      summary: Start a job
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobCreate'
+      responses:
+        '202':
+          description: The job was queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /jobs/{jobId}:
+    get:
+      tags: [jobs]
+      operationId: getJob
+      summary: A job with its timeline
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: The job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /jobs/{jobId}/cancel:
+    post:
+      tags: [jobs]
+      operationId: cancelJob
+      summary: Cancel a job
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: The job, now cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /jobs/{jobId}/resume:
+    post:
+      tags: [jobs]
+      operationId: resumeJob
+      summary: Resume a paused job
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: The job, queued again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /events:
+    get:
+      tags: [jobs]
+      operationId: streamEvents
+      summary: Server-sent events for jobs, egresses and accounts
+      parameters:
+        - name: Last-Event-ID
+          in: header
+          schema:
+            type: string
+      responses:
+        '200':
+          description: An SSE stream. Each event's data is one Event object as JSON.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /library:
+    get:
+      tags: [library]
+      operationId: listLibrary
+      summary: Stored galleries
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: One page of library items.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LibraryItem'
+                  next:
+                    $ref: '#/components/schemas/Cursor'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /library/{gid}:
+    get:
+      tags: [library]
+      operationId: getLibraryItem
+      summary: One stored gallery
+      parameters:
+        - $ref: '#/components/parameters/Gid'
+      responses:
+        '200':
+          description: The library item.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryItem'
+        default:
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [library]
+      operationId: deleteLibraryItem
+      summary: Delete a stored gallery
+      description: The only way anything in the library is deleted.
+      parameters:
+        - $ref: '#/components/parameters/Gid'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: Deleted.
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /library/{gid}/pages/{number}:
+    get:
+      tags: [library]
+      operationId: getLibraryPage
+      summary: One stored page image
+      parameters:
+        - $ref: '#/components/parameters/Gid'
+        - $ref: '#/components/parameters/PageNumber'
+      responses:
+        '200':
+          description: The image bytes.
+          headers:
+            X-Image-Sha1:
+              $ref: '#/components/headers/ImageSha1'
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /admin/accounts:
+    get:
+      tags: [admin]
+      operationId: listAccounts
+      summary: All E-Hentai accounts known to the server
+      responses:
+        '200':
+          description: Accounts without their credentials.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Account'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      tags: [admin]
+      operationId: importAccount
+      summary: Import an account's cookies for a user
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountImport'
+      responses:
+        '201':
+          description: The account, after a session check.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /admin/accounts/{id}:
+    delete:
+      tags: [admin]
+      operationId: removeAccount
+      summary: Remove an account and its stored credentials
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204':
+          description: Removed.
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /admin/tokens:
+    get:
+      tags: [admin]
+      operationId: listTokens
+      summary: API tokens
+      responses:
+        '200':
+          description: Tokens without their secrets.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApiToken'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      tags: [admin]
+      operationId: createToken
+      summary: Create an API token for a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, name, scopes]
+              properties:
+                userId:
+                  type: string
+                name:
+                  type: string
+                scopes:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: '#/components/schemas/Scope'
+      responses:
+        '201':
+          description: The token; its secret is shown only here.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiTokenCreated'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /admin/tokens/{id}:
+    delete:
+      tags: [admin]
+      operationId: revokeToken
+      summary: Revoke an API token
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204':
+          description: Revoked.
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /admin/samples:
+    get:
+      tags: [admin]
+      operationId: listSamples
+      summary: Saved upstream samples
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: One page of samples.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Sample'
+                  next:
+                    $ref: '#/components/schemas/Cursor'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /admin/debug-bundle:
+    get:
+      tags: [admin]
+      operationId: getDebugBundle
+      summary: Logs, job timelines and samples, redacted
+      responses:
+        '200':
+          description: A zip archive.
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Problem'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  headers:
+    RequestId:
+      description: Ties the request to logs, upstream calls, events and errors.
+      schema:
+        type: string
+    ImageSha1:
+      description: SHA-1 of the image bytes.
+      schema:
+        type: string
+        pattern: '^[0-9a-f]{40}$'
+    ImageDegraded:
+      description: '"true" when the image was served smaller than requested.'
+      schema:
+        type: string
+        enum: ['true', 'false']
+
+  parameters:
+    Gid:
+      name: gid
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    Token:
+      name: token
+      in: query
+      description: The gallery token. Required when the server does not know it yet.
+      schema:
+        $ref: '#/components/schemas/GalleryToken'
+    PageNumber:
+      name: number
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    CommentId:
+      name: commentId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 0
+    Slot:
+      name: slot
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 9
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        $ref: '#/components/schemas/Cursor'
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+
+  responses:
+    Problem:
+      description: An error. `code` comes from docs/outcomes.md.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+    Cursor:
+      type: string
+      description: Opaque. Clients pass it back unchanged.
+
+    GalleryToken:
+      type: string
+      pattern: '^[0-9a-f]{10}$'
+
+    GalleryRef:
+      type: object
+      required: [gid, token]
+      properties:
+        gid:
+          type: integer
+          minimum: 1
+        token:
+          $ref: '#/components/schemas/GalleryToken'
+
+    Category:
+      type: string
+      enum: [doujinshi, manga, artistCg, gameCg, western, nonH, imageSet, cosplay, asianPorn, misc]
+
+    AdvancedSearchOption:
+      type: string
+      enum: [searchName, searchTags, searchDescription, searchTorrentNames, onlyWithTorrents, searchLowPowerTags, searchDownvotedTags, showExpunged]
+
+    TriState:
+      type: string
+      enum: ['yes', 'no', unknown]
+
+    Provenance:
+      type: object
+      required: [observedAt, source]
+      properties:
+        observedAt:
+          type: string
+          format: date-time
+        source:
+          type: string
+          description: The upstream operation that produced the data, such as gdata or detailPage.
+
+    Tag:
+      type: object
+      required: [namespace, name]
+      properties:
+        namespace:
+          type: string
+          pattern: '^[a-z]+$'
+        name:
+          type: string
+
+    Rating:
+      type: object
+      required: [average]
+      properties:
+        average:
+          type: number
+          minimum: 0
+          maximum: 5
+        count:
+          type: integer
+          minimum: 0
+
+    Torrent:
+      type: object
+      required: [hash, addedAt, name, torrentSize, fileSize]
+      properties:
+        hash:
+          type: string
+        addedAt:
+          type: string
+          format: date-time
+        name:
+          type: string
+        torrentSize:
+          type: integer
+          minimum: 0
+        fileSize:
+          type: integer
+          minimum: 0
+
+    Language:
+      type: object
+      required: [name, translated, rewrite]
+      properties:
+        name:
+          type: string
+        translated:
+          type: boolean
+        rewrite:
+          type: boolean
+
+    Lineage:
+      type: object
+      properties:
+        parent:
+          $ref: '#/components/schemas/GalleryRef'
+        first:
+          $ref: '#/components/schemas/GalleryRef'
+        current:
+          $ref: '#/components/schemas/GalleryRef'
+
+    NewerVersion:
+      type: object
+      required: [gallery, title, addedAt]
+      properties:
+        gallery:
+          $ref: '#/components/schemas/GalleryRef'
+        title:
+          type: string
+        addedAt:
+          type: string
+          format: date-time
+
+    Gallery:
+      description: Global facts. A field is present only when known; null means the site says there is none.
+      allOf:
+        - $ref: '#/components/schemas/GalleryRef'
+        - $ref: '#/components/schemas/Provenance'
+        - type: object
+          properties:
+            title:
+              type: string
+            titleJpn:
+              type: [string, 'null']
+            category:
+              $ref: '#/components/schemas/Category'
+            uploader:
+              type: [string, 'null']
+            posted:
+              type: string
+              format: date-time
+            fileCount:
+              type: integer
+              minimum: 0
+            fileSize:
+              type: integer
+              minimum: 0
+            expunged:
+              type: boolean
+            rating:
+              $ref: '#/components/schemas/Rating'
+            torrentCount:
+              type: integer
+              minimum: 0
+            torrents:
+              type: array
+              items:
+                $ref: '#/components/schemas/Torrent'
+            tags:
+              type: array
+              items:
+                $ref: '#/components/schemas/Tag'
+            language:
+              oneOf:
+                - $ref: '#/components/schemas/Language'
+                - type: 'null'
+            lineage:
+              $ref: '#/components/schemas/Lineage'
+            newerVersions:
+              type: array
+              items:
+                $ref: '#/components/schemas/NewerVersion'
+            favoritedCount:
+              type: integer
+              minimum: 0
+            visible:
+              type: boolean
+            links:
+              type: object
+              properties:
+                thumbnail:
+                  type: string
+                pages:
+                  type: string
+
+    Favorite:
+      type: object
+      required: [slot]
+      properties:
+        slot:
+          type: integer
+          minimum: 0
+          maximum: 9
+        note:
+          type: [string, 'null']
+
+    GalleryUserState:
+      description: Account-scoped. Never cached across accounts.
+      type: object
+      required: [gid, observedAt]
+      properties:
+        gid:
+          type: integer
+          minimum: 1
+        favorite:
+          oneOf:
+            - $ref: '#/components/schemas/Favorite'
+            - type: 'null'
+        myRating:
+          type: [number, 'null']
+          minimum: 0.5
+          maximum: 5
+        canRate:
+          type: boolean
+        canComment:
+          type: boolean
+        observedAt:
+          type: string
+          format: date-time
+
+    Confirmation:
+      type: object
+      required: [method, observedAt]
+      properties:
+        method:
+          type: string
+          enum: [readBack]
+        observedAt:
+          type: string
+          format: date-time
+
+    GalleryUserStateWrite:
+      type: object
+      required: [state, confirmation]
+      properties:
+        state:
+          $ref: '#/components/schemas/GalleryUserState'
+        confirmation:
+          $ref: '#/components/schemas/Confirmation'
+
+    Page:
+      type: object
+      required: [gid, number, pageToken]
+      properties:
+        gid:
+          type: integer
+          minimum: 1
+        number:
+          type: integer
+          minimum: 1
+        pageToken:
+          type: string
+          pattern: '^[0-9a-f]{10}$'
+        links:
+          type: object
+          properties:
+            thumbnail:
+              type: string
+            image:
+              type: string
+
+    PageList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Page'
+        next:
+          $ref: '#/components/schemas/Cursor'
+
+    Variant:
+      type: object
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [original, resample]
+        width:
+          type: integer
+          minimum: 1
+
+    ImageFile:
+      type: object
+      required: [sha1, size, width, height, format, variant, degraded]
+      properties:
+        sha1:
+          type: string
+          pattern: '^[0-9a-f]{40}$'
+        size:
+          type: integer
+          minimum: 1
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        format:
+          type: string
+          enum: [jpg, png, gif, webp]
+        variant:
+          $ref: '#/components/schemas/Variant'
+        degraded:
+          type: boolean
+        originalSha1:
+          type: string
+          pattern: '^[0-9a-f]{40}$'
+
+    CommentUserState:
+      type: object
+      required: [myVote, canVote, canEdit]
+      properties:
+        myVote:
+          type: integer
+          enum: [-1, 0, 1]
+        canVote:
+          type: boolean
+        canEdit:
+          type: boolean
+
+    Comment:
+      type: object
+      required: [commentId, author, isUploader, postedAt, body]
+      properties:
+        commentId:
+          type: integer
+          minimum: 0
+        author:
+          type: string
+        isUploader:
+          type: boolean
+        postedAt:
+          type: string
+          format: date-time
+        editedAt:
+          type: [string, 'null']
+          format: date-time
+        score:
+          type: [integer, 'null']
+        body:
+          type: object
+          required: [html, text]
+          properties:
+            html:
+              type: string
+              description: Sanitized.
+            text:
+              type: string
+        userState:
+          $ref: '#/components/schemas/CommentUserState'
+
+    CommentList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+
+    SearchPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Gallery'
+        next:
+          $ref: '#/components/schemas/Cursor'
+        prev:
+          $ref: '#/components/schemas/Cursor'
+        total:
+          type: object
+          required: [value, approximate]
+          properties:
+            value:
+              type: integer
+              minimum: 0
+            approximate:
+              type: boolean
+        filteredOut:
+          type: integer
+          minimum: 0
+
+    ToplistType:
+      type: string
+      enum: [galleries, uploaders, tagging, hentaiAtHome, ehTracker, cleanup, ratingAndReviewing]
+
+    ToplistPeriod:
+      type: string
+      enum: [allTime, pastYear, pastMonth, yesterday]
+
+    Toplist:
+      type: object
+      required: [type, period, entries]
+      properties:
+        type:
+          $ref: '#/components/schemas/ToplistType'
+        period:
+          $ref: '#/components/schemas/ToplistPeriod'
+        entries:
+          type: array
+          items:
+            type: object
+            required: [rank]
+            properties:
+              rank:
+                type: integer
+                minimum: 1
+              gallery:
+                $ref: '#/components/schemas/GalleryRef'
+              name:
+                type: string
+
+    FavoriteFolder:
+      type: object
+      required: [slot, name, count]
+      properties:
+        slot:
+          type: integer
+          minimum: 0
+          maximum: 9
+        name:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+
+    FavoritePage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [gallery, slot]
+            properties:
+              gallery:
+                $ref: '#/components/schemas/Gallery'
+              slot:
+                type: integer
+                minimum: 0
+                maximum: 9
+              note:
+                type: [string, 'null']
+              favoritedAt:
+                type: string
+                format: date-time
+        next:
+          $ref: '#/components/schemas/Cursor'
+        prev:
+          $ref: '#/components/schemas/Cursor'
+
+    WatchedTag:
+      type: object
+      required: [id, tag, watched, hidden]
+      properties:
+        id:
+          type: string
+        tag:
+          $ref: '#/components/schemas/Tag'
+        watched:
+          type: boolean
+        hidden:
+          type: boolean
+        color:
+          type: [string, 'null']
+        weight:
+          type: integer
+
+    WatchedTagCreate:
+      type: object
+      required: [tag]
+      properties:
+        tag:
+          $ref: '#/components/schemas/Tag'
+        watched:
+          type: boolean
+          default: true
+        hidden:
+          type: boolean
+          default: false
+        color:
+          type: string
+        weight:
+          type: integer
+
+    QuotaState:
+      type: object
+      required: [mode, restrictedToLowResolution]
+      properties:
+        mode:
+          type: string
+          enum: [account, ip, temporary, unknown]
+        used:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 0
+        restrictedToLowResolution:
+          $ref: '#/components/schemas/TriState'
+        resetCost:
+          type: integer
+          minimum: 0
+        temporaryUntil:
+          type: string
+          format: date-time
+
+    AccountState:
+      type: object
+      required: [session, siteAccess, quota, observedAt]
+      properties:
+        session:
+          type: string
+          enum: [valid, expired, unknown]
+        siteAccess:
+          type: object
+          required: [eh, ex]
+          properties:
+            eh:
+              $ref: '#/components/schemas/TriState'
+            ex:
+              $ref: '#/components/schemas/TriState'
+        quota:
+          $ref: '#/components/schemas/QuotaState'
+        gp:
+          type: integer
+          minimum: 0
+        credits:
+          type: integer
+          minimum: 0
+        observedAt:
+          type: string
+          format: date-time
+
+    Account:
+      type: object
+      required: [id, userId, egressId, state]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        egressId:
+          type: string
+        state:
+          $ref: '#/components/schemas/AccountState'
+
+    AccountImport:
+      type: object
+      required: [userId, egressId, cookies]
+      properties:
+        userId:
+          type: string
+        egressId:
+          type: string
+        cookies:
+          type: object
+          required: [ipb_member_id, ipb_pass_hash]
+          properties:
+            ipb_member_id:
+              type: string
+              pattern: '^[0-9]+$'
+            ipb_pass_hash:
+              type: string
+              pattern: '^[0-9a-f]{32}$'
+            igneous:
+              type: string
+            iq:
+              type: string
+
+    Egress:
+      type: object
+      required: [id, kind, state, accountCount, sharedWarning]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [mock, probe, direct, proxy]
+        state:
+          type: string
+          enum: [ok, warned, cooldown, banned, degraded, unavailable]
+        cooldownUntil:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          description: The outcome code that caused the current state.
+        accountCount:
+          type: integer
+          minimum: 0
+        sharedWarning:
+          type: boolean
+          description: True while more than one account uses this egress.
+
+    JobState:
+      type: string
+      enum: [queued, running, paused, succeeded, failed, cancelled]
+
+    JobCreate:
+      type: object
+      required: [kind, target]
+      properties:
+        kind:
+          type: string
+          enum: [download, archiveDownload, refresh]
+        target:
+          $ref: '#/components/schemas/GalleryRef'
+        variant:
+          type: string
+          enum: [resample, original]
+          default: resample
+        gpBudget:
+          type: integer
+          minimum: 0
+          default: 0
+
+    JobStep:
+      type: object
+      required: [name, startedAt, outcome]
+      properties:
+        name:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        durationMs:
+          type: integer
+          minimum: 0
+        outcome:
+          $ref: '#/components/schemas/Outcome'
+
+    Job:
+      type: object
+      required: [id, kind, target, state, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [download, archiveDownload, refresh]
+        target:
+          $ref: '#/components/schemas/GalleryRef'
+        state:
+          $ref: '#/components/schemas/JobState'
+        progress:
+          type: object
+          properties:
+            pagesDone:
+              type: integer
+              minimum: 0
+            pagesTotal:
+              type: integer
+              minimum: 0
+            bytes:
+              type: integer
+              minimum: 0
+        outcome:
+          $ref: '#/components/schemas/Outcome'
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobStep'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Event:
+      type: object
+      required: [id, type, at]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [jobUpdated, egressUpdated, accountUpdated]
+        at:
+          type: string
+          format: date-time
+        jobId:
+          type: string
+        egressId:
+          type: string
+        accountId:
+          type: string
+        outcome:
+          $ref: '#/components/schemas/Outcome'
+
+    LibraryFile:
+      allOf:
+        - $ref: '#/components/schemas/ImageFile'
+        - type: object
+          required: [number, fileName]
+          properties:
+            number:
+              type: integer
+              minimum: 1
+            fileName:
+              type: string
+
+    LibraryItem:
+      type: object
+      required: [gallery, formatVersion, files, completeness, integrity, storedAt]
+      properties:
+        gallery:
+          $ref: '#/components/schemas/Gallery'
+        formatVersion:
+          type: integer
+          minimum: 1
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/LibraryFile'
+        completeness:
+          type: object
+          required: [state]
+          properties:
+            state:
+              type: string
+              enum: [complete, partial]
+            missingPages:
+              type: array
+              items:
+                type: integer
+                minimum: 1
+        integrity:
+          type: string
+          enum: [verified, mismatch]
+        storedAt:
+          type: string
+          format: date-time
+
+    OutcomeKind:
+      type: string
+      enum: [success, empty, degraded, failure, unrecognized, unconfirmed]
+
+    ClientAction:
+      type: string
+      enum: [none, retry_after, retry_same_key, user_action, give_up]
+
+    Outcome:
+      type: object
+      required: [kind, code, clientAction]
+      properties:
+        kind:
+          $ref: '#/components/schemas/OutcomeKind'
+        code:
+          type: string
+          description: A code from docs/outcomes.md.
+        clientAction:
+          $ref: '#/components/schemas/ClientAction'
+        retryAfter:
+          type: integer
+          minimum: 0
+        requestId:
+          type: string
+        sampleId:
+          type: string
+
+    Problem:
+      type: object
+      required: [type, title, status, code, clientAction, requestId]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+        clientAction:
+          $ref: '#/components/schemas/ClientAction'
+        retryAfter:
+          type: integer
+          minimum: 0
+        requestId:
+          type: string
+        detail:
+          type: string
+
+    Scope:
+      type: string
+      enum: [read, write, jobs, admin]
+
+    ApiToken:
+      type: object
+      required: [id, userId, name, scopes, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        name:
+          type: string
+        scopes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Scope'
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+
+    ApiTokenCreated:
+      allOf:
+        - $ref: '#/components/schemas/ApiToken'
+        - type: object
+          required: [secret]
+          properties:
+            secret:
+              type: string
+
+    Sample:
+      type: object
+      required: [id, requestId, code, at, operation]
+      properties:
+        id:
+          type: string
+        requestId:
+          type: string
+        code:
+          type: string
+        at:
+          type: string
+          format: date-time
+        operation:
+          type: string
+
+    Meta:
+      type: object
+      required: [name, version, apiVersion, capabilities]
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        apiVersion:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down]
+        checks:
+          type: array
+          items:
+            type: object
+            required: [name, status]
+            properties:
+              name:
+                type: string
+              status:
+                type: string
+                enum: [ok, degraded, down]
+              detail:
+                type: string
