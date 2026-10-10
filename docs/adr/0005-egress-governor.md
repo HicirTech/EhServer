@@ -34,6 +34,8 @@ Initial limits, to be revised with evidence:
 | `archive` | 2 concurrent streams |
 | `nl` reloads | at most 1 per page, counted against a per-account budget |
 
+These limits protect the site. The `mock` profile keeps "one at a time" but has no gap between starts: it protects nothing, and tests need not wait.
+
 ## Consequences
 
 - Throughput is bounded by design. Performance work therefore means issuing fewer upstream requests ([nfr.md](../nfr.md) PERF).
