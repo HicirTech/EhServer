@@ -184,6 +184,16 @@ export function readTag(text: string | undefined): Tag | null {
     : { namespace: match[1], name: match[2] };
 }
 
+/** A colour field such as a tag's: `#rrggbb`. */
+export function readHexColor(text: string | undefined): string | null {
+  return text !== undefined && /^#[0-9A-Fa-f]{6}$/.test(text) ? text : null;
+}
+
+/** The tag set select names each set with its number of tags: `Tagset #1 (10)`. */
+export function readTagSetCount(text: string | undefined): number | null {
+  return readInteger(/\(([\d,]+)\)$/.exec(normalizeSpace(text ?? ""))?.[1]);
+}
+
 export function readScriptVariables(
   script: string,
 ): { readonly gid: number; readonly token: string; readonly apiuid: number } | null {
