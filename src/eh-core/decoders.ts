@@ -35,6 +35,20 @@ const Months = [
   "December",
 ];
 
+/** The `rgba(r,g,b,…)` row colour of favourites folders 0 to 9. */
+const FavoriteColors = [
+  "0,0,0",
+  "240,0,0",
+  "240,160,0",
+  "208,208,0",
+  "0,128,0",
+  "144,240,64",
+  "64,176,240",
+  "0,0,240",
+  "80,0,128",
+  "224,128,224",
+];
+
 const SecondsPerUnit: Readonly<Record<string, number>> = {
   day: 24 * 60 * 60,
   hour: 60 * 60,
@@ -129,6 +143,26 @@ export function readPreviewLink(href: string | undefined, gid: number): PageKey 
 /** The gid in a pager link: `next=<gid>` or `prev=<gid>`. */
 export function readCursor(href: string | undefined, direction: "next" | "prev"): number | null {
   return readInteger(new RegExp(`[?&]${direction}=(\\d+)(?:&|$)`).exec(href ?? "")?.[1]);
+}
+
+/** Favourites ordered by favourited time page through `next=<gid>-<time>`. */
+export function readFavoritesCursor(
+  href: string | undefined,
+  direction: "next" | "prev",
+): string | null {
+  return new RegExp(`[?&]${direction}=(\\d+-\\d+)(?:&|$)`).exec(href ?? "")?.[1] ?? null;
+}
+
+/** The folder a `.fp` entry opens: `document.location='…/favorites.php?favcat=<slot>'`. */
+export function readFavoriteFolderLink(onclick: string | undefined): number | null {
+  return readInteger(/\/favorites\.php\?favcat=(\d)'$/.exec(onclick ?? "")?.[1]);
+}
+
+/** The folder a favourited gallery is in, from the `background-color` the site gives its row. */
+export function readFavoriteColor(style: string | undefined): number | null {
+  const color = /background-color:rgba\((\d+,\d+,\d+),/.exec(style ?? "")?.[1];
+  const slot = FavoriteColors.indexOf(color ?? "");
+  return slot < 0 ? null : slot;
 }
 
 /** `Found 1,234 results.` states a total; `Found thousands of results.` does not. */

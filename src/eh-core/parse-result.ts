@@ -8,6 +8,7 @@ export type FailureCode =
   | "too_fast_warning"
   | "ip_banned"
   | "quota_exhausted"
+  | "signed_out"
   | "sad_panda"
   | "gallery_removed"
   | "gallery_unavailable"
