@@ -76,7 +76,7 @@ Scope is what the server action applies to: the request, the job, the account or
 | `upstream_unrecognized` | unrecognized | nothing matched | request and job | fail; keep a sample; alert; pause the job | 502 | `retry_after` |
 | `write_unconfirmed` | unconfirmed | the read-back did not confirm the write | request | do not resend | 502 | `retry_same_key` |
 
-EhServer's own conditions use ordinary statuses: 400 for an invalid request, 401 for a missing or bad token, 403 for a missing scope, 404 for an unknown resource, and 429 when a client exceeds EhServer's own limits.
+EhServer's own conditions use ordinary statuses: 400 for an invalid request, 401 for a missing or bad token, 403 for a missing scope, 404 for an unknown resource, 429 when a client exceeds EhServer's own limits, and 501 for a toplist type that is not served yet ([ADR-0010](adr/0010-complete-toplists.md)).
 
 ## 5. Problem response
 

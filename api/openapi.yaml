@@ -170,7 +170,12 @@ paths:
     get:
       tags: [discovery]
       operationId: getToplist
-      summary: A toplist
+      summary: A whole toplist
+      description: |
+        Every entry of the latest complete snapshot of the toplist, never part of it
+        (ADR-0010). Without a snapshot the server starts reading the toplist and
+        answers 202; ask again after `Retry-After`. Only `galleries` is served for
+        now; the other types answer 501.
       parameters:
         - name: type
           in: path
@@ -184,11 +189,23 @@ paths:
             $ref: '#/components/schemas/ToplistPeriod'
       responses:
         '200':
-          description: The ranked entries.
+          description: The whole toplist, up to a day old; `observedAt` says when it was read.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Toplist'
+        '202':
+          description: No snapshot yet; the server is reading the toplist.
+          headers:
+            Retry-After:
+              description: Seconds until the snapshot is expected.
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToplistPending'
         default:
           $ref: '#/components/responses/Problem'
 
@@ -1428,25 +1445,49 @@ components:
 
     Toplist:
       type: object
-      required: [type, period, entries]
+      required: [type, period, observedAt, entries]
       properties:
         type:
           $ref: '#/components/schemas/ToplistType'
         period:
           $ref: '#/components/schemas/ToplistPeriod'
+        observedAt:
+          type: string
+          format: date-time
+          description: When the walk that made the snapshot ended.
         entries:
           type: array
+          description: Every entry, in rank order.
           items:
             type: object
-            required: [rank]
+            required: [rank, score]
             properties:
               rank:
                 type: integer
                 minimum: 1
+              score:
+                type: integer
+                minimum: 0
               gallery:
                 $ref: '#/components/schemas/GalleryRef'
               name:
                 type: string
+
+    ToplistPending:
+      type: object
+      required: [type, period, pagesDone]
+      properties:
+        type:
+          $ref: '#/components/schemas/ToplistType'
+        period:
+          $ref: '#/components/schemas/ToplistPeriod'
+        pagesDone:
+          type: integer
+          minimum: 0
+        pagesTotal:
+          type: integer
+          minimum: 1
+          description: Present once the first page has been read.
 
     FavoriteFolder:
       type: object

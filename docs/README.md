@@ -4,7 +4,7 @@ EhServer is a generic, self-hosted HTTP API over the E-Hentai domain. These docu
 
 | Document | Status | Content |
 |---|---|---|
-| [Architecture decisions](adr/) | see each ADR | ADR-0001 to ADR-0009 |
+| [Architecture decisions](adr/) | see each ADR | ADR-0001 to ADR-0010 |
 | [Domain model](domain-model.md) | Proposed | Entities, identities, value sets, lifecycles, invariants |
 | [Outcome catalog](outcomes.md) | Proposed | How every upstream response is classified, and what happens next |
 | [Non-functional requirements](nfr.md) | Proposed | Quality bar, requirements, hazards and controls |
@@ -28,3 +28,4 @@ EhServer is released under the [MIT License](../LICENSE).
 | [0007](adr/0007-library-format.md) | The library format | Proposed |
 | [0008](adr/0008-api-style.md) | REST with an OpenAPI contract, SSE for events | Accepted in principle |
 | [0009](adr/0009-html-parsing.md) | How HTML is parsed: htmlparser2 with css-select | Accepted |
+| [0010](adr/0010-complete-toplists.md) | Toplists are served whole, from snapshots | Accepted in part |
