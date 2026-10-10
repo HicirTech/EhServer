@@ -44,9 +44,10 @@ export interface Unrecognized {
   readonly raw: string;
 }
 
+/** A page that has no empty result (`E` left as `never`) gets no `Empty` member at all. */
 export type ParseResult<T, E extends string = never> =
   | Success<T>
-  | Empty<E>
+  | ([E] extends [never] ? never : Empty<E>)
   | Failure
   | Unrecognized;
 
