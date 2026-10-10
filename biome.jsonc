@@ -1,0 +1,51 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": { "ignoreUnknown": false },
+
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf",
+    "lineWidth": 100
+  },
+
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
+  },
+
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "correctness": {
+        "noUnusedImports": "error"
+      },
+      "style": {
+        // verbatimModuleSyntax turns a value import of a type into a real runtime import.
+        "useImportType": "error",
+        // `!` would undo noUncheckedIndexedAccess.
+        "noNonNullAssertion": "error"
+      }
+    }
+  },
+
+  "assist": {
+    "enabled": true,
+    "actions": { "source": { "organizeImports": "on" } }
+  },
+
+  "overrides": [
+    {
+      // Product logs go through the one redactor, never straight to the console (nfr.md OBS-3).
+      "includes": ["src/**"],
+      "linter": { "rules": { "suspicious": { "noConsole": "error" } } }
+    }
+  ]
+}
