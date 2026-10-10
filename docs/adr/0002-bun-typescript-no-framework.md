@@ -16,5 +16,5 @@ The maintainer's usual stack is Bun with TypeScript, and the project does not ne
 ## Consequences
 
 - Routing, validation and error mapping are our own code. It stays small and is fully covered by tests.
-- Validating requests and responses against the OpenAPI contract needs a validator choice (open, [ADR-0008](0008-api-style.md)).
+- Responses are checked against the OpenAPI contract by our own checker, not a library ([ADR-0008](0008-api-style.md)).
 - The mock of E-Hentai uses the same stack ([outcomes.md](../outcomes.md), rule R7).

@@ -1,6 +1,6 @@
 # ADR-0008: REST with an OpenAPI contract, SSE for events
 
-- Status: Accepted (maintainer, 2026-10-10): REST, contract first, SSE. The details below are Proposed.
+- Status: Accepted (maintainer, 2026-10-10): REST, contract first, SSE. The contract checker is our own (maintainer, 2026-10-11). The other details below are Proposed.
 
 ## Decision
 
@@ -12,8 +12,9 @@
 - Changes within `v1` are additive only. Capabilities are discoverable at `/meta`.
 - Every response carries `X-Request-Id` and `Server-Timing`.
 - Writes take an `Idempotency-Key` header.
+- Tests check responses against the contract with our own checker (`src/contract/`). It knows exactly the JSON Schema the contract uses, and fails on any other keyword instead of skipping it. Objects are closed: a property the contract does not declare is a finding, so no undeclared field reaches a client.
 
 ## Consequences
 
 - Clients never need to reach an E-Hentai host; EhServer serves the images too.
-- A validator that checks requests and responses against the contract is needed (choice open).
+- When the contract starts using another JSON Schema keyword, the checker fails until it learns it.
