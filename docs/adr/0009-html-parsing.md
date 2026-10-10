@@ -6,7 +6,7 @@
 
 `eh-core` parses HTML pages: lists, gallery details, single pages, the home page, favourites and the archiver. Positive identification ([ADR-0003](0003-eh-core-positive-identification.md)) checks a page's structure, not only the values in it.
 
-The two options were Bun's built-in `HTMLRewriter` and a DOM library. The spike in [`spikes/0009-html-parsing`](../../spikes/0009-html-parsing/) ported a compact-mode search page and a gallery page with both. Each collector only takes strings out of the page; the same decoders and assemblers turn them into readings, so the comparison isolates HTML access.
+The two options were Bun's built-in `HTMLRewriter` and a DOM library. The spike in [`spikes/0009-html-parsing`](https://github.com/HicirTech/EhServer/tree/17771f6f06b1dbb0e79804be0211461e344ee683/spikes/0009-html-parsing), removed once `eh-core` had its first parsers, ported a compact-mode search page and a gallery page with both. Each collector only takes strings out of the page; the same decoders and assemblers turn them into readings, so the comparison isolates HTML access.
 
 Evidence:
 
