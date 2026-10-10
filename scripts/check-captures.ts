@@ -9,11 +9,13 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 
-import { readScriptVariables } from "../src/eh-core/decoders";
+import { readScriptVariables, readSinglePageVariables } from "../src/eh-core/decoders";
 import { classifyEnvelope } from "../src/eh-core/envelope";
 import { parseGalleryPage } from "../src/eh-core/gallery-page";
+import { parseHomePage } from "../src/eh-core/home-page";
 import type { ParseResult } from "../src/eh-core/parse-result";
 import { parseSearchPage } from "../src/eh-core/search-page";
+import { parseSinglePage } from "../src/eh-core/single-page";
 
 const DefaultRuns = 10;
 
@@ -53,9 +55,9 @@ function checkPage(html: string, runs: number) {
     return { envelope: describe(envelope, () => "") };
   }
 
-  // A captured page has no request behind it, so the gallery it names is taken as the expected one.
-  const variables = readScriptVariables(html);
-  const expected = variables ?? { gid: 0, token: "" };
+  // A captured page has no request behind it, so the gallery or page it names is taken as expected.
+  const expected = readScriptVariables(html) ?? { gid: 0, token: "" };
+  const page = readSinglePageVariables(html) ?? { gid: 0, number: 0, pageToken: "" };
   return {
     search: describe(parseSearchPage(html), (value) => `${value.galleries.length} galleries`),
     searchMs: medianMs(runs, () => parseSearchPage(html)),
@@ -65,6 +67,11 @@ function checkPage(html: string, runs: number) {
         `${value.gallery.tags.length} tags, ${value.previews.pages.length} previews, ${value.comments.length} comments`,
     ),
     galleryMs: medianMs(runs, () => parseGalleryPage(html, expected)),
+    singlePage: describe(
+      parseSinglePage(html, page),
+      (value) => `image ${value.image.file.width}px`,
+    ),
+    home: describe(parseHomePage(html), (value) => `${value.mode} limit`),
   };
 }
 
