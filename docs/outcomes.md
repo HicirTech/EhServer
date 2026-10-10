@@ -52,12 +52,12 @@ Scope is what the server action applies to: the request, the job, the account or
 | `ok_empty` | empty | no hits; filtered to empty; no watched tags | request | return an empty result | 200 | `none` |
 | `ok_degraded` | degraded | image served below the requested variant | job | keep it marked degraded; pause the job if it requires originals | 200 with `degraded: true` | `none` |
 | `cancelled` | failure | client disconnect or cancel | request | stop; no retry | none sent | — |
-| `network` | failure | transport error or timeout | request | retry twice with backoff, then fail the step | 502 | `retry_after` |
+| `network` | failure | transport error or timeout | request | retry twice with backoff (after 2 s, then 8 s), then fail the step | 502 | `retry_after` |
 | `upstream_rate_limited` | failure | HTTP 429 | egress | cooldown for `Retry-After`, 60 s if absent | 503 | `retry_after` |
 | `cloudflare_challenge` | failure | HTTP 403 with a challenge page | egress | cooldown 30 min; alert | 503 | `retry_after` |
 | `upstream_unavailable` | failure | HTTP 5xx, or `Backend fetch failed` | egress | retry after 60 s, at most 3 times; then fail | 503 | `retry_after` |
 | `too_fast_warning` | failure | the "opening pages too fast" warning | egress | cooldown of at least 15 min; halve the page rate for 24 h; alert | 503 | `retry_after` |
-| `ip_banned` | failure | the ban text, with its expiry parsed | egress | cooldown until the expiry plus 10 %; alert | 503 | `retry_after` |
+| `ip_banned` | failure | the ban text, with its expiry parsed | egress | cooldown until the expiry plus 10 %, an hour when no expiry is given; alert | 503 | `retry_after` |
 | `ip_degraded` | failure | the home page says the IP is restricted to low resolution | egress | stop original-image work; alert | 503 for originals | `retry_after` |
 | `quota_exhausted` | failure | a 509 image or a limit text | account, or egress in IP mode | pause image work for 60 min, then recheck the home page | 503 | `retry_after` |
 | `insufficient_gp` | failure | GP texts, or `Insufficient funds.` | account | pause GP-spending work | 409 | `user_action` |
