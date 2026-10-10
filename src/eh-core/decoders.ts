@@ -165,6 +165,16 @@ export function readFavoriteColor(style: string | undefined): number | null {
   return slot < 0 ? null : slot;
 }
 
+/** A toplist link: `toplist.php?tl=<code>`, with `&p=<page>` after the first page. */
+export function readToplistLink(
+  href: string | undefined,
+): { readonly code: number; readonly page: number } | null {
+  const match = /\/toplist\.php\?tl=(\d+)(?:&p=(\d+))?$/.exec(href ?? "");
+  const code = readInteger(match?.[1]);
+  const page = match?.[2] === undefined ? 0 : readInteger(match[2]);
+  return code === null || page === null ? null : { code, page };
+}
+
 /** `Found 1,234 results.` states a total; `Found thousands of results.` does not. */
 export function readSearchText(text: string | undefined): { total?: number; filteredOut?: number } {
   const value = normalizeSpace(text ?? "");

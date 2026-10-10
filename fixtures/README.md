@@ -21,5 +21,6 @@ A builder is a claim about the shape of a real page. Each one names the capture 
 | `favoritesPageHtml` | a favourites folder captured in 2024-09 in Extended mode, ordered by favourited time; the "Show All" view and the Minimal and Compact rows follow pages captured in 2023-07 in every display mode. **Unconfirmed**: an empty folder (the builder leaves the list out), a filled note (`Note: …`), the row colours of folders 3 to 9 (the palette clients use), and the posted time's border colour, which the builder leaves out |
 | `watchedTagsPageHtml` | a My Tags page captured on ExHentai in 2022-01, with one tag set whose tags are all watched; hidden tags, a set colour and an empty tag set are **unconfirmed** |
 | `logOnPageHtml` | **unconfirmed**: only the paragraph `This page requires you to log on.` is known |
+| `galleryToplistPageHtml` | galleries toplists captured in 2023 (all-time) and 2024-04 (yesterday): Compact rows behind a rank-and-score cell, with page-number paging. Whether a toplist follows the account's display mode is **unconfirmed** |
 
 Where a builder and a newer real page disagree, the real page wins, and the builder changes in the same piece of work.
