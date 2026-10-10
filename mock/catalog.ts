@@ -1,5 +1,5 @@
 import { type DetailPage, detailComment, detailPage } from "../fixtures/eh/detail-page";
-import { type CompactRow, compactRow } from "../fixtures/eh/list-page";
+import { type GalleryRow, galleryRow } from "../fixtures/eh/list-page";
 import type { Site } from "../fixtures/eh/page-shell";
 
 /** The mock serves galleries 9000001 to 9000060; the newest has the highest gid. */
@@ -60,9 +60,9 @@ export function matchesSearch(gid: number, search: string): boolean {
   return texts.some((text) => text.toLowerCase().includes(phrase));
 }
 
-export function listRow(gid: number): CompactRow {
+export function listRow(gid: number): GalleryRow {
   const gallery = catalogGallery(gid);
-  return compactRow({
+  return galleryRow({
     gid,
     token: gallery.token,
     title: gallery.title,

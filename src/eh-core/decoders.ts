@@ -1,7 +1,13 @@
 /** Pure decoders from the site's text to values. Null means the text is not in the expected form. */
-import type { Category, GalleryRef, PreviewPage, Tag } from "./readings";
+import type { Category, GalleryRef, Tag } from "../domain/gallery";
 
-const Categories: Readonly<Record<string, Category>> = {
+/** A page of a gallery as preview links name it. */
+export interface PageKey {
+  readonly number: number;
+  readonly pageToken: string;
+}
+
+const CategoryLabels: Readonly<Record<string, Category>> = {
   Doujinshi: "doujinshi",
   Manga: "manga",
   "Artist CG": "artistCg",
@@ -29,10 +35,12 @@ const Months = [
   "December",
 ];
 
-/** One star of the rating sprite is 16 px wide; the half-star row sits 20 px lower. */
-const StarWidthPx = 16;
-const HalfStarRowPx = -21;
-const FullStarRowPx = -1;
+const SecondsPerUnit: Readonly<Record<string, number>> = {
+  day: 24 * 60 * 60,
+  hour: 60 * 60,
+  minute: 60,
+  second: 1,
+};
 
 /** Collapses runs of whitespace, NBSP included, the way a browser renders the text. */
 export function normalizeSpace(text: string): string {
@@ -44,68 +52,50 @@ export function readNonEmpty(text: string | undefined): string | null {
   return value === "" ? null : value;
 }
 
+/** Pages and `gdata` use the same labels. */
 export function readCategory(label: string | undefined): Category | null {
-  return Categories[normalizeSpace(label ?? "")] ?? null;
+  return CategoryLabels[normalizeSpace(label ?? "")] ?? null;
 }
 
 /** The site prints times in UTC as `yyyy-MM-dd HH:mm`. */
 export function readSiteTime(text: string | undefined): string | null {
   const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(normalizeSpace(text ?? ""));
-  if (match === null) {
-    return null;
-  }
-
-  const [, year, month, day, hour, minute] = match.map(Number);
-  return toUtc(year, month, day, hour, minute);
+  return match === null
+    ? null
+    : toUtc(
+        Number(match[1]),
+        Number(match[2]),
+        Number(match[3]),
+        Number(match[4]),
+        Number(match[5]),
+      );
 }
 
 /** Comments print `dd MMMM yyyy, HH:mm`, also in UTC. */
 export function readCommentTime(text: string | undefined): string | null {
   const match = /^(\d{2}) ([A-Za-z]+) (\d{4}), (\d{2}):(\d{2})$/.exec(normalizeSpace(text ?? ""));
-  if (match === null) {
-    return null;
-  }
-
-  const month = Months.indexOf(match[2] ?? "") + 1;
-  return month === 0
+  const month = Months.indexOf(match?.[2] ?? "") + 1;
+  return match === null || month === 0
     ? null
     : toUtc(Number(match[3]), month, Number(match[1]), Number(match[4]), Number(match[5]));
 }
 
-function toUtc(
-  year: number | undefined,
-  month: number | undefined,
-  day: number | undefined,
-  hour: number | undefined,
-  minute: number | undefined,
-): string | null {
-  if (year === undefined || month === undefined || day === undefined) {
-    return null;
-  }
-
-  const date = new Date(Date.UTC(year, month - 1, day, hour ?? 0, minute ?? 0));
-  const isSameDay = date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-  return isSameDay && (hour ?? 0) < 24 && (minute ?? 0) < 60
-    ? date.toISOString().replace(".000Z", "Z")
-    : null;
+/** `gdata` gives `posted` as epoch seconds, in a string. */
+export function readEpochSeconds(value: unknown): string | null {
+  const seconds = readIntegerValue(value);
+  return seconds === null ? null : new Date(seconds * 1000).toISOString().replace(".000Z", "Z");
 }
 
-/** Reads stars from the sprite offset in a `style` attribute, for example `-16px -21px` is 3.5. */
-export function readStars(style: string | undefined): number | null {
-  const match = /background-position:\s*(-?\d+)px\s+(-?\d+)px/.exec(style ?? "");
-  const x = Number(match?.[1]);
-  const y = Number(match?.[2]);
-  if (
-    match === null ||
-    x > 0 ||
-    x % StarWidthPx !== 0 ||
-    ![FullStarRowPx, HalfStarRowPx].includes(y)
-  ) {
-    return null;
-  }
-
-  const stars = 5 + x / StarWidthPx - (y === HalfStarRowPx ? 0.5 : 0);
-  return stars >= 0 ? stars : null;
+function toUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+): string | null {
+  const date = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const isSameDay = date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+  return isSameDay && hour < 24 && minute < 60 ? date.toISOString().replace(".000Z", "Z") : null;
 }
 
 export function readPageCount(text: string | undefined): number | null {
@@ -128,7 +118,7 @@ export function readGalleryLink(href: string | undefined): GalleryRef | null {
   return gid === null || match?.[2] === undefined ? null : { gid, token: match[2] };
 }
 
-export function readPreviewLink(href: string | undefined, gid: number): PreviewPage | null {
+export function readPreviewLink(href: string | undefined, gid: number): PageKey | null {
   const match = /\/s\/([0-9a-f]{10})\/(\d+)-(\d+)$/.exec(href ?? "");
   const number = readInteger(match?.[3]);
   return match?.[1] === undefined || Number(match[2]) !== gid || number === null
@@ -152,9 +142,9 @@ export function readSearchText(text: string | undefined): { total?: number; filt
   };
 }
 
-/** Each list tag carries its whole name in its `title`: `namespace:name`. */
-export function readTag(title: string | undefined): Tag | null {
-  const match = /^([a-z]+):(.+)$/.exec(normalizeSpace(title ?? ""));
+/** `namespace:name`, as `gdata` writes tags when asked for namespaces. */
+export function readTag(text: string | undefined): Tag | null {
+  const match = /^([a-z]+):(.+)$/.exec(normalizeSpace(text ?? ""));
   return match?.[1] === undefined || match[2] === undefined
     ? null
     : { namespace: match[1], name: match[2] };
@@ -178,8 +168,18 @@ export function readRatingAverage(text: string | undefined): number | "notRated"
     return "notRated";
   }
 
-  const average = Number(/^Average: (\d(?:\.\d+)?)$/.exec(value)?.[1]);
-  return Number.isNaN(average) || average > 5 ? null : average;
+  return readRatingValue(/^Average: (.+)$/.exec(value)?.[1]);
+}
+
+/** A rating from 0 to 5, written as a decimal number. */
+export function readRatingValue(value: unknown): number | null {
+  const text = typeof value === "number" ? String(value) : value;
+  if (typeof text !== "string" || !/^\d(?:\.\d+)?$/.test(text)) {
+    return null;
+  }
+
+  const rating = Number(text);
+  return rating <= 5 ? rating : null;
 }
 
 export function readTorrentCount(text: string | undefined): number | null {
@@ -202,7 +202,7 @@ export function readShowing(
 /** The header reads `Posted on 26 September 2026, 09:15 by: <author>`. */
 export function readCommentPosted(header: string | undefined, author: string): string | null {
   const text = normalizeSpace(header ?? "");
-  if (!text.endsWith(author)) {
+  if (author === "" || !text.endsWith(author)) {
     return null;
   }
 
@@ -211,7 +211,8 @@ export function readCommentPosted(header: string | undefined, author: string): s
 }
 
 export function readScore(text: string | undefined): number | null {
-  return readSignedInteger(normalizeSpace(text ?? ""));
+  const value = normalizeSpace(text ?? "");
+  return /^[+-]?\d+$/.test(value) ? Number(value) : null;
 }
 
 /** "Yes", or "No" followed by the reason the gallery is hidden. */
@@ -224,10 +225,39 @@ export function readVisible(text: string | undefined): boolean | null {
   return /^No\b/.test(value) ? false : null;
 }
 
-export function readInteger(text: string | undefined): number | null {
-  return text !== undefined && /^[\d,]+$/.test(text) ? Number(text.replaceAll(",", "")) : null;
+/** `The ban expires in 59 minutes and 48 seconds`: the wait, in seconds. */
+export function readBanExpiry(text: string): number | null {
+  const parts = /The ban expires in (.+?)\.?$/.exec(normalizeSpace(text))?.[1]?.split(/, | and /);
+  if (parts === undefined) {
+    return null;
+  }
+
+  let seconds = 0;
+  for (const part of parts) {
+    const match = /^(\d+) (day|hour|minute|second)s?$/.exec(part);
+    const unit = SecondsPerUnit[match?.[2] ?? ""];
+    if (match === null || unit === undefined) {
+      return null;
+    }
+
+    seconds += Number(match[1]) * unit;
+  }
+
+  return seconds;
 }
 
-function readSignedInteger(text: string): number | null {
-  return /^[+-]?\d+$/.test(text) ? Number(text) : null;
+/** A whole number written with optional thousands separators. */
+export function readInteger(text: string | undefined): number | null {
+  return text !== undefined && /^\d{1,3}(?:,?\d{3})*$/.test(text)
+    ? Number(text.replaceAll(",", ""))
+    : null;
+}
+
+/** `gdata` writes some counts as numbers and others as strings of digits. */
+export function readIntegerValue(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value >= 0 ? value : null;
+  }
+
+  return typeof value === "string" && /^\d+$/.test(value) ? Number(value) : null;
 }
