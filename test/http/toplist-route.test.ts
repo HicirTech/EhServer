@@ -6,6 +6,7 @@ import { failure, unrecognized } from "../../src/eh-core/parse-result";
 import { createApp } from "../../src/http/app";
 import { toplistRoute } from "../../src/http/toplist-route";
 import type { ToplistAnswer, ToplistService } from "../../src/toplists/service";
+import { responseFindings } from "../support/contract";
 
 const RequestId = "req_test";
 
@@ -153,5 +154,44 @@ describe("toplist route", () => {
     expect(response.status).toBe(status);
     expect(await response.json()).toMatchObject({ code });
     expect(asked).toEqual([]);
+  });
+
+  test.each<[name: string, answer: ToplistAnswer, path: string]>([
+    ["a snapshot", Snapshot, "galleries?period=yesterday"],
+    [
+      "a walk in progress",
+      { kind: "pending", progress: { pagesDone: 40, pagesTotal: 202 }, retryAfterSeconds: 729 },
+      "galleries?period=allTime",
+    ],
+    [
+      "a walk before its first page",
+      { kind: "pending", progress: null, retryAfterSeconds: 909 },
+      "galleries?period=pastYear",
+    ],
+    [
+      "a walk a ban stopped",
+      {
+        kind: "stopped",
+        stop: failure("ip_banned", "The ban expires in 59 minutes", 3540),
+        retryAfterSeconds: 3894,
+      },
+      "galleries?period=pastMonth",
+    ],
+    [
+      "an unrecognized page",
+      { kind: "stopped", stop: unrecognized("h1.ih a[href]"), retryAfterSeconds: 600 },
+      "galleries?period=yesterday",
+    ],
+    [
+      "no answer from the site",
+      { kind: "stopped", stop: { kind: "network", message: "reset" }, retryAfterSeconds: 600 },
+      "galleries?period=yesterday",
+    ],
+    ["an unknown period", Snapshot, "galleries?period=lastWeek"],
+    ["a type not served yet", Snapshot, "uploaders?period=yesterday"],
+  ])("MAINT-2: %s matches the contract", async (_name, answer, path) => {
+    const { get } = serving(answer);
+
+    expect(await responseFindings("getToplist", await get(path))).toEqual([]);
   });
 });
