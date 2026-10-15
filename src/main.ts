@@ -19,6 +19,7 @@ import { createApp } from "./http/app";
 import { toplistRoute } from "./http/toplist-route";
 import { createLogger, type Logger } from "./log/logger";
 import { openDatabase } from "./store/database";
+import { egressStateStore } from "./store/egress-states";
 import { toplistSnapshotStore } from "./store/toplist-snapshots";
 import { createToplistService } from "./toplists/service";
 
@@ -51,7 +52,7 @@ export function startServer({
 }: ServerOptions): RunningServer {
   mkdirSync(dataDir, { recursive: true });
   const db = openDatabase(join(dataDir, DatabaseFile));
-  const lane = createPageLane(mockEgress(mockUrl), MockPagePacing);
+  const lane = createPageLane(mockEgress(mockUrl), MockPagePacing, egressStateStore(db));
   const toplists = createToplistService({
     store: toplistSnapshotStore(db),
     send: withNetworkRetries((request) => lane.send(request, "background"), SystemClock.sleep),

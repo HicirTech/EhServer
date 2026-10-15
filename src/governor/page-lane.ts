@@ -1,10 +1,15 @@
 /**
  * Page loads on one egress (ADR-0005): one at a time, each starting a random 3 to 6 s after the
  * last one started. A waiting client's page goes before a waiting background walk (ADR-0010).
+ * An answer whose outcome rests the egress stops page loads until the cooldown ends, and the
+ * cooldown is stored, so a restart keeps it (nfr.md H2, REL-3).
  */
+import type { OutcomeCode } from "../domain/outcomes";
 import type { Egress } from "../egress/egress";
-import type { UpstreamResponse } from "../eh-core/envelope";
+import { classifyEnvelope, type UpstreamResponse } from "../eh-core/envelope";
 import type { UpstreamRequest } from "../eh-core/upstream-request";
+import type { EgressStateStore } from "../store/egress-states";
+import { pageCooldownMs } from "./page-cooldowns";
 
 export type Priority = "foreground" | "background";
 
@@ -32,30 +37,54 @@ export const SystemClock: Clock = { now: () => Date.now(), sleep: (ms) => Bun.sl
 /** A page that has not answered by then is a transport error (outcome `network`). */
 const PageTimeoutMs = 30_000;
 
+/** outcomes.md `egress_cooldown`: the page was not sent, because the egress rests until `until`. */
+export interface Refusal {
+  readonly kind: "refused";
+  /** The outcome that started the cooldown. */
+  readonly reason: OutcomeCode;
+  readonly until: Date;
+}
+
+export type PageAnswer =
+  | { readonly kind: "answered"; readonly response: UpstreamResponse }
+  | Refusal;
+
 export interface PageLane {
-  send(request: UpstreamRequest, priority: Priority): Promise<UpstreamResponse>;
+  /** Rejects only for a transport error; an answer of any status, and a refusal, resolve. */
+  send(request: UpstreamRequest, priority: Priority): Promise<PageAnswer>;
 }
 
 interface Waiting {
   readonly request: UpstreamRequest;
-  readonly resolve: (response: UpstreamResponse) => void;
+  readonly resolve: (answer: PageAnswer) => void;
   readonly reject: (error: unknown) => void;
 }
 
 export function createPageLane(
   egress: Egress,
   pacing: Pacing,
+  states: EgressStateStore,
   clock: Clock = SystemClock,
   random: () => number = Math.random,
 ): PageLane {
   const queues: Record<Priority, Waiting[]> = { foreground: [], background: [] };
+  let state = states.get(egress.id);
   let isRunning = false;
   let nextStartAt = 0;
 
-  /** The priority is chosen when the gap is over, so a client arriving during it goes first. */
+  /**
+   * The priority is chosen when the gap is over, so a client arriving during it goes first. No
+   * cooldown can start during the gap: nothing is in flight then.
+   */
   async function run(): Promise<void> {
     isRunning = true;
     while (queues.foreground.length + queues.background.length > 0) {
+      const refusal = refusalNow();
+      if (refusal !== null) {
+        refuseWaiting(refusal);
+        break;
+      }
+
       const wait = nextStartAt - clock.now();
       if (wait > 0) {
         await clock.sleep(wait);
@@ -68,13 +97,49 @@ export function createPageLane(
 
       nextStartAt = clock.now() + pacing.minGapMs + random() * (pacing.maxGapMs - pacing.minGapMs);
       try {
-        next.resolve(await egress.send(next.request, AbortSignal.timeout(PageTimeoutMs)));
+        const response = await egress.send(next.request, AbortSignal.timeout(PageTimeoutMs));
+        noteOutcome(response);
+        next.resolve({ kind: "answered", response });
       } catch (error) {
         next.reject(error);
       }
     }
 
     isRunning = false;
+  }
+
+  function refusalNow(): Refusal | null {
+    if (state === null || state.cooldownUntil.getTime() <= clock.now()) {
+      return null;
+    }
+
+    return { kind: "refused", reason: state.reason, until: state.cooldownUntil };
+  }
+
+  function refuseWaiting(refusal: Refusal): void {
+    for (const waiting of [...queues.foreground.splice(0), ...queues.background.splice(0)]) {
+      waiting.resolve(refusal);
+    }
+  }
+
+  /** An outcome whose scope is the egress (outcomes.md section 4) rests its page loads. */
+  function noteOutcome(response: UpstreamResponse): void {
+    const outcome = classifyEnvelope(response);
+    if (outcome === null || outcome.kind !== "failure") {
+      return;
+    }
+
+    const cooldownMs = pageCooldownMs(outcome);
+    if (cooldownMs === 0) {
+      return;
+    }
+
+    state = {
+      cooldownUntil: new Date(clock.now() + cooldownMs),
+      reason: outcome.code,
+      slowedUntil: state?.slowedUntil ?? null,
+    };
+    states.put(egress.id, state);
   }
 
   return {

@@ -7,20 +7,23 @@ import { startMock } from "../../mock/server";
 import { mockEgress } from "../../src/egress/egress";
 import type { UpstreamRequest } from "../../src/eh-core/upstream-request";
 import { withNetworkRetries } from "../../src/governor/network-retries";
-import { createPageLane, MockPagePacing } from "../../src/governor/page-lane";
+import {
+  type Clock,
+  createPageLane,
+  MockPagePacing,
+  type PageAnswer,
+} from "../../src/governor/page-lane";
 import { openDatabase } from "../../src/store/database";
+import { egressStateStore } from "../../src/store/egress-states";
 import { type ToplistSnapshotStore, toplistSnapshotStore } from "../../src/store/toplist-snapshots";
 import { createToplistService, type ToplistAnswer } from "../../src/toplists/service";
 
 const mock = startMock();
-const lane = createPageLane(mockEgress(mock.url), MockPagePacing);
-const background = withNetworkRetries(
-  (request: UpstreamRequest) => lane.send(request, "background"),
-  async () => {},
-);
 const Start = Date.parse("2026-10-11T00:00:00Z");
 const Minute = 60_000;
 const Day = 24 * 60 * Minute;
+
+type Send = (request: UpstreamRequest) => Promise<PageAnswer>;
 
 afterAll(() => mock.stop());
 
@@ -29,10 +32,40 @@ beforeEach(() => {
   mock.clearRequests();
 });
 
-/** A service over a new database, on a clock that moves only when the test moves it. */
-function setup(send = background, store: ToplistSnapshotStore = newStore()) {
+interface SetupOptions {
+  readonly store?: ToplistSnapshotStore;
+  /** Wraps the service's page loads. */
+  readonly through?: (send: Send) => Send;
+}
+
+/**
+ * A service over a new database, with a lane of its own, on a clock that moves only when the test
+ * moves it. The lane keeps the same time, so its cooldowns end when the test says.
+ */
+function setup({ store = newStore(), through = (send) => send }: SetupOptions = {}) {
   let time = Start;
-  const service = createToplistService({ store, send, secondsPerPage: 4.5, now: () => time });
+  const clock: Clock = {
+    now: () => time,
+    sleep: async (ms) => {
+      time += ms;
+    },
+  };
+  const lane = createPageLane(
+    mockEgress(mock.url),
+    MockPagePacing,
+    egressStateStore(openDatabase(":memory:")),
+    clock,
+  );
+  const background = withNetworkRetries(
+    (request: UpstreamRequest) => lane.send(request, "background"),
+    async () => {},
+  );
+  const service = createToplistService({
+    store,
+    send: through(background),
+    secondsPerPage: 4.5,
+    now: () => time,
+  });
   return {
     service,
     store,
@@ -47,13 +80,15 @@ function newStore(): ToplistSnapshotStore {
 }
 
 /** Each walk reads the second page between the first page and its rereads, so the list moves. */
-async function recomputingAfterSecondPage(request: UpstreamRequest) {
-  const response = await background(request);
-  if (request.target.endsWith("&p=1")) {
-    mock.recomputeToplists();
-  }
+function recomputingAfterSecondPage(send: Send): Send {
+  return async (request) => {
+    const answer = await send(request);
+    if (request.target.endsWith("&p=1")) {
+      mock.recomputeToplists();
+    }
 
-  return response;
+    return answer;
+  };
 }
 
 function observedAt(answer: ToplistAnswer): string | null {
@@ -112,7 +147,7 @@ describe("toplist service", () => {
   });
 
   test("H5: a walk the list moved under waits 10 minutes, and an hour after three", async () => {
-    const { service, advance } = setup(recomputingAfterSecondPage);
+    const { service, advance } = setup({ through: recomputingAfterSecondPage });
 
     service.get("yesterday");
     await service.whenIdle();
@@ -136,7 +171,7 @@ describe("toplist service", () => {
   });
 
   test("H5: a stopped walk breaks a run of moved ones", async () => {
-    const { service, advance } = setup(recomputingAfterSecondPage);
+    const { service, advance } = setup({ through: recomputingAfterSecondPage });
     service.get("yesterday");
     await service.whenIdle();
     advance(10 * Minute);
@@ -183,6 +218,28 @@ describe("toplist service", () => {
     expect(mock.requests()).toEqual([]);
   });
 
+  test("H2: a cooldown one walk met refuses the other toplists' walks until it ends", async () => {
+    const { service } = setup();
+    mock.addFault({ fault: "http_429", pathPrefix: "/toplist.php", times: 1 });
+    service.get("yesterday");
+    await service.whenIdle();
+    mock.clearRequests();
+
+    service.get("pastMonth");
+    await service.whenIdle();
+
+    expect(service.get("pastMonth")).toEqual({
+      kind: "stopped",
+      stop: {
+        kind: "refused",
+        reason: "upstream_rate_limited",
+        until: new Date(Start + RetryAfterSeconds * 1000),
+      },
+      retryAfterSeconds: 600,
+    });
+    expect(mock.requests()).toEqual([]);
+  });
+
   test("H2: a failed refresh leaves the stale snapshot served, and waits before trying again", async () => {
     const { service, advance } = setup();
     service.get("yesterday");
@@ -219,12 +276,12 @@ describe("toplist service", () => {
 
   test("REL-3, I8: a snapshot outlives the service that made it", async () => {
     const store = newStore();
-    const first = setup(background, store);
+    const first = setup({ store });
     first.service.get("yesterday");
     await first.service.whenIdle();
     mock.clearRequests();
 
-    const restarted = setup(background, store);
+    const restarted = setup({ store });
 
     expect(restarted.service.get("yesterday").kind).toBe("snapshot");
     expect(mock.requests()).toEqual([]);
