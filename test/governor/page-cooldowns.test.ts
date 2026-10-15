@@ -2,9 +2,10 @@
 import { describe, expect, test } from "bun:test";
 
 import { type FailureCode, failure } from "../../src/eh-core/parse-result";
-import { pageCooldownMs } from "../../src/governor/page-cooldowns";
+import { pageCooldownMs, pageSlowdownMs } from "../../src/governor/page-cooldowns";
 
 const Minute = 60_000;
+const Hour = 60 * Minute;
 
 describe("pageCooldownMs", () => {
   test.each<[name: string, code: FailureCode, retryAfterSeconds: number | undefined, ms: number]>([
@@ -17,5 +18,14 @@ describe("pageCooldownMs", () => {
     ["a removed gallery concerns only its request", "gallery_removed", undefined, 0],
   ])("H2: %s", (_name, code, retryAfterSeconds, ms) => {
     expect(pageCooldownMs(failure(code, "", retryAfterSeconds))).toBe(ms);
+  });
+});
+
+describe("pageSlowdownMs", () => {
+  test.each<[name: string, code: FailureCode, ms: number]>([
+    ["the too-fast warning halves the page rate for 24 hours", "too_fast_warning", 24 * Hour],
+    ["a rate limit leaves the page rate as it was", "upstream_rate_limited", 0],
+  ])("H2: %s", (_name, code, ms) => {
+    expect(pageSlowdownMs(failure(code))).toBe(ms);
   });
 });

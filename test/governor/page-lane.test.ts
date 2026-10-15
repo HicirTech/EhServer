@@ -14,6 +14,7 @@ import { openDatabase } from "../../src/store/database";
 import { type EgressStateStore, egressStateStore } from "../../src/store/egress-states";
 
 const Minute = 60_000;
+const Hour = 60 * Minute;
 
 /** Time moves only when the lane sleeps or the test lets it pass, so every start time is exact. */
 function virtualClock(): Clock {
@@ -214,5 +215,47 @@ describe("page lane", () => {
       until: new Date(RetryAfterSeconds * 1000),
     });
     expect(started).toEqual([]);
+  });
+
+  test("H2: after the too-fast warning's cooldown, pages start twice as far apart for 24 h", async () => {
+    const clock = virtualClock();
+    const { egress, started } = recordingEgress(clock);
+    const lane = createPageLane(egress, SitePagePacing, newStates(), clock, () => 0);
+
+    await lane.send(page("/too_fast_text"), "background");
+    await clock.sleep(15 * Minute);
+    await Promise.all(["/a", "/b"].map((target) => lane.send(page(target), "background")));
+    await clock.sleep(24 * Hour);
+    await Promise.all(["/c", "/d"].map((target) => lane.send(page(target), "background")));
+
+    expect(started.slice(1)).toEqual([
+      { target: "/a", at: 15 * Minute },
+      { target: "/b", at: 15 * Minute + 6_000 },
+      { target: "/c", at: 24 * Hour + 15 * Minute + 6_000 },
+      { target: "/d", at: 24 * Hour + 15 * Minute + 9_000 },
+    ]);
+  });
+
+  test("REL-3: a lane over the stored state keeps the halved rate", async () => {
+    const clock = virtualClock();
+    const states = newStates();
+    const warned = createPageLane(
+      recordingEgress(clock).egress,
+      SitePagePacing,
+      states,
+      clock,
+      () => 0,
+    );
+    await warned.send(page("/too_fast_text"), "background");
+    await clock.sleep(15 * Minute);
+    const { egress, started } = recordingEgress(clock);
+    const restarted = createPageLane(egress, SitePagePacing, states, clock, () => 0);
+
+    await Promise.all(["/a", "/b"].map((target) => restarted.send(page(target), "background")));
+
+    expect(started).toEqual([
+      { target: "/a", at: 15 * Minute },
+      { target: "/b", at: 15 * Minute + 6_000 },
+    ]);
   });
 });

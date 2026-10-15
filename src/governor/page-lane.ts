@@ -1,15 +1,16 @@
 /**
  * Page loads on one egress (ADR-0005): one at a time, each starting a random 3 to 6 s after the
  * last one started. A waiting client's page goes before a waiting background walk (ADR-0010).
- * An answer whose outcome rests the egress stops page loads until the cooldown ends, and the
- * cooldown is stored, so a restart keeps it (nfr.md H2, REL-3).
+ * An answer whose outcome rests the egress stops page loads until the cooldown ends; after the
+ * too-fast warning they then run at half rate for 24 h. Both are stored, so a restart keeps them
+ * (nfr.md H2, REL-3).
  */
 import type { OutcomeCode } from "../domain/outcomes";
 import type { Egress } from "../egress/egress";
 import { classifyEnvelope, type UpstreamResponse } from "../eh-core/envelope";
 import type { UpstreamRequest } from "../eh-core/upstream-request";
 import type { EgressStateStore } from "../store/egress-states";
-import { pageCooldownMs } from "./page-cooldowns";
+import { pageCooldownMs, pageSlowdownMs } from "./page-cooldowns";
 
 export type Priority = "foreground" | "background";
 
@@ -36,6 +37,8 @@ export const SystemClock: Clock = { now: () => Date.now(), sleep: (ms) => Bun.sl
 
 /** A page that has not answered by then is a transport error (outcome `network`). */
 const PageTimeoutMs = 30_000;
+/** Half the page rate is twice the gap. */
+const SlowedGapFactor = 2;
 
 /** outcomes.md `egress_cooldown`: the page was not sent, because the egress rests until `until`. */
 export interface Refusal {
@@ -95,7 +98,7 @@ export function createPageLane(
         break;
       }
 
-      nextStartAt = clock.now() + pacing.minGapMs + random() * (pacing.maxGapMs - pacing.minGapMs);
+      nextStartAt = clock.now() + gapMs();
       try {
         const response = await egress.send(next.request, AbortSignal.timeout(PageTimeoutMs));
         noteOutcome(response);
@@ -122,6 +125,14 @@ export function createPageLane(
     }
   }
 
+  function gapMs(): number {
+    const gap = pacing.minGapMs + random() * (pacing.maxGapMs - pacing.minGapMs);
+    const slowedUntil = state?.slowedUntil ?? null;
+    return slowedUntil !== null && slowedUntil.getTime() > clock.now()
+      ? gap * SlowedGapFactor
+      : gap;
+  }
+
   /** An outcome whose scope is the egress (outcomes.md section 4) rests its page loads. */
   function noteOutcome(response: UpstreamResponse): void {
     const outcome = classifyEnvelope(response);
@@ -130,14 +141,16 @@ export function createPageLane(
     }
 
     const cooldownMs = pageCooldownMs(outcome);
-    if (cooldownMs === 0) {
+    const slowdownMs = pageSlowdownMs(outcome);
+    if (cooldownMs === 0 && slowdownMs === 0) {
       return;
     }
 
+    const now = clock.now();
     state = {
-      cooldownUntil: new Date(clock.now() + cooldownMs),
+      cooldownUntil: new Date(now + cooldownMs),
       reason: outcome.code,
-      slowedUntil: state?.slowedUntil ?? null,
+      slowedUntil: slowdownMs === 0 ? (state?.slowedUntil ?? null) : new Date(now + slowdownMs),
     };
     states.put(egress.id, state);
   }
