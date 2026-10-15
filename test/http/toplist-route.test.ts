@@ -43,6 +43,16 @@ const Snapshot: ToplistAnswer = {
   },
 };
 
+const Refused: ToplistAnswer = {
+  kind: "stopped",
+  stop: {
+    kind: "refused",
+    reason: "upstream_rate_limited",
+    until: new Date("2026-10-11T08:02:00Z"),
+  },
+  retryAfterSeconds: 600,
+};
+
 describe("toplist route", () => {
   test("ADR-0010: a snapshot is the whole toplist, with when it was read", async () => {
     const { get, asked } = serving(Snapshot);
@@ -141,6 +151,21 @@ describe("toplist route", () => {
     expect(body).not.toContain("127.0.0.1");
   });
 
+  test("H2: a walk refused while the egress rests is egress_cooldown, saying why and until when", async () => {
+    const { get } = serving(Refused);
+
+    const response = await get("galleries?period=yesterday");
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("600");
+    expect(await response.json()).toMatchObject({
+      code: "egress_cooldown",
+      clientAction: "retry_after",
+      retryAfter: 600,
+      detail: "the egress rests until 2026-10-11T08:02:00.000Z after upstream_rate_limited",
+    });
+  });
+
   test.each([
     ["an unknown type", "favourites?period=yesterday", 400, "invalid_request"],
     ["a missing period", "galleries", 400, "invalid_request"],
@@ -187,6 +212,7 @@ describe("toplist route", () => {
       { kind: "stopped", stop: { kind: "network", message: "reset" }, retryAfterSeconds: 600 },
       "galleries?period=yesterday",
     ],
+    ["a walk refused while the egress rests", Refused, "galleries?period=yesterday"],
     ["an unknown period", Snapshot, "galleries?period=lastWeek"],
     ["a type not served yet", Snapshot, "uploaders?period=yesterday"],
   ])("MAINT-2: %s matches the contract", async (_name, answer, path) => {

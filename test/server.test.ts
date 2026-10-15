@@ -29,14 +29,14 @@ afterAll(async () => {
 const PollMs = 20;
 const PollLimit = 250;
 
-async function getToplist(query: string): Promise<Response> {
-  return fetch(`${server.url}/api/v1/toplists/${query}`);
+async function getToplist(query: string, url = server.url): Promise<Response> {
+  return fetch(`${url}/api/v1/toplists/${query}`);
 }
 
-/** Polls as a client would, until the whole toplist is there. */
-async function whenServed(query: string): Promise<Response> {
+/** Polls as a client would, until the answer is no longer 202. */
+async function whenServed(query: string, url = server.url): Promise<Response> {
   for (let attempt = 0; attempt < PollLimit; attempt++) {
-    const response = await getToplist(query);
+    const response = await getToplist(query, url);
     if (response.status !== 202) {
       return response;
     }
@@ -74,5 +74,36 @@ describe("EhServer", () => {
 
     expect(response.status).toBe(501);
     expect(await responseFindings("getToplist", response)).toEqual([]);
+  });
+
+  test("REL-3: a cooldown outlives a restart, so the new server sends nothing while it lasts", async () => {
+    const limitedMock = startMock();
+    const limitedDir = mkdtempSync(join(tmpdir(), "ehserver-data-"));
+    const options = {
+      dataDir: limitedDir,
+      mockUrl: limitedMock.url,
+      port: 0,
+      log: createLogger(() => {}),
+    };
+    try {
+      limitedMock.addFault({ fault: "http_429", pathPrefix: "/toplist.php", times: 1 });
+      const first = startServer(options);
+      const limited = await (await whenServed("galleries?period=yesterday", first.url)).json();
+      await first.stop();
+      limitedMock.clearRequests();
+
+      const restarted = startServer(options);
+      const refused = await whenServed("galleries?period=pastMonth", restarted.url);
+      const refusedBody = await refused.json();
+      await restarted.stop();
+
+      expect(limited).toMatchObject({ code: "upstream_rate_limited" });
+      expect(refused.status).toBe(503);
+      expect(refusedBody).toMatchObject({ code: "egress_cooldown" });
+      expect(limitedMock.requests()).toEqual([]);
+    } finally {
+      await limitedMock.stop();
+      rmSync(limitedDir, { recursive: true, force: true });
+    }
   });
 });

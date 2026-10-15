@@ -6,7 +6,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { openDatabase, schemaVersion } from "../../src/store/database";
+import { egressStateStore } from "../../src/store/egress-states";
 import { Migrations } from "../../src/store/migrations";
+import { type ToplistSnapshot, toplistSnapshotStore } from "../../src/store/toplist-snapshots";
 
 const folders: string[] = [];
 
@@ -73,6 +75,25 @@ describe("openDatabase", () => {
     expect(schemaVersion(db)).toBe(1);
     db.close();
     expect(tables(path)).toEqual(["first"]);
+  });
+
+  test("REL-3: a database from the first step keeps its snapshots when the later steps run", () => {
+    const path = databasePath();
+    const snapshot: ToplistSnapshot = {
+      period: "yesterday",
+      observedAt: new Date("2026-10-11T08:00:00.000Z"),
+      entries: [{ rank: 1, score: 12_000, gallery: { gid: 9000001, token: "a1b2c3d4e5" } }],
+    };
+    const first = openDatabase(path, Migrations.slice(0, 1));
+    toplistSnapshotStore(first).put(snapshot);
+    first.close();
+
+    const db = openDatabase(path);
+
+    expect(schemaVersion(db)).toBe(Migrations.length);
+    expect(toplistSnapshotStore(db).get("yesterday")).toEqual(snapshot);
+    expect(egressStateStore(db).get("mock")).toBeNull();
+    db.close();
   });
 
   test("a database migrated by a newer server is refused", () => {

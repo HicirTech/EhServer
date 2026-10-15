@@ -3,7 +3,7 @@
  * again. A page that cannot be read ends the walk with the reason; the caller decides when to retry.
  */
 import type { ToplistPeriod } from "../domain/toplist";
-import { classifyEnvelope, type UpstreamResponse } from "../eh-core/envelope";
+import { classifyEnvelope } from "../eh-core/envelope";
 import type { Failure, Unrecognized } from "../eh-core/parse-result";
 import {
   type GalleryToplistReading,
@@ -13,12 +13,17 @@ import {
 } from "../eh-core/toplist-page";
 import { assembleToplistWalk } from "../eh-core/toplist-walk";
 import type { UpstreamRequest } from "../eh-core/upstream-request";
+import type { PageAnswer, Refusal } from "../governor/page-lane";
 
-/** Why a page could not be read: an outcome the site gave, an unknown page, or no answer at all. */
+/**
+ * Why a page could not be read: an outcome the site gave, an unknown page, no answer at all, or a
+ * cooldown that kept the page from being sent.
+ */
 export type PageStop =
   | Failure
   | Unrecognized
-  | { readonly kind: "network"; readonly message: string };
+  | { readonly kind: "network"; readonly message: string }
+  | Refusal;
 
 export type ToplistWalkResult =
   | {
@@ -41,7 +46,7 @@ export interface WalkOptions {
   readonly onProgress?: (progress: WalkProgress) => void;
 }
 
-type Send = (request: UpstreamRequest) => Promise<UpstreamResponse>;
+type Send = (request: UpstreamRequest) => Promise<PageAnswer>;
 
 export async function walkGalleryToplist(
   period: ToplistPeriod,
@@ -98,19 +103,23 @@ async function readPage(
   page: number,
   send: Send,
 ): Promise<GalleryToplistReading | PageStop> {
-  let response: UpstreamResponse;
+  let answer: PageAnswer;
   try {
-    response = await send(galleryToplistRequest(period, page));
+    answer = await send(galleryToplistRequest(period, page));
   } catch (error) {
     return { kind: "network", message: error instanceof Error ? error.message : String(error) };
   }
 
-  const envelope = classifyEnvelope(response);
+  if (answer.kind === "refused") {
+    return answer;
+  }
+
+  const envelope = classifyEnvelope(answer.response);
   if (envelope !== null) {
     return envelope;
   }
 
-  const result = parseGalleryToplistPage(response.body, period);
+  const result = parseGalleryToplistPage(answer.response.body, period);
   return result.kind === "success" ? result.value : result;
 }
 

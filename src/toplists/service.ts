@@ -5,9 +5,9 @@
  */
 
 import type { ToplistPeriod } from "../domain/toplist";
-import type { UpstreamResponse } from "../eh-core/envelope";
 import type { UpstreamRequest } from "../eh-core/upstream-request";
 import { pageCooldownMs } from "../governor/page-cooldowns";
+import type { PageAnswer } from "../governor/page-lane";
 import type { ToplistSnapshot, ToplistSnapshotStore } from "../store/toplist-snapshots";
 import {
   type PageStop,
@@ -36,7 +36,7 @@ export interface ToplistService {
 export interface ToplistServiceOptions {
   readonly store: ToplistSnapshotStore;
   /** Background page loads, network retries included. */
-  readonly send: (request: UpstreamRequest) => Promise<UpstreamResponse>;
+  readonly send: (request: UpstreamRequest) => Promise<PageAnswer>;
   /** The average time between page loads, to tell a waiting client when to come back. */
   readonly secondsPerPage: number;
   readonly now?: () => number;
@@ -117,10 +117,22 @@ export function createToplistService({
       return;
     }
 
-    const cooldown = result.stop.kind === "failure" ? pageCooldownMs(result.stop) : 0;
     state.movedInARow = 0;
     state.lastStop = result.stop;
-    state.notBefore = now() + Math.max(StoppedRetryMs, cooldown);
+    state.notBefore = now() + Math.max(StoppedRetryMs, restMs(result.stop));
+  }
+
+  /** How long the egress rests after the stop: the outcome's cooldown, or what is left of one. */
+  function restMs(stop: PageStop): number {
+    switch (stop.kind) {
+      case "failure":
+        return pageCooldownMs(stop);
+      case "refused":
+        return stop.until.getTime() - now();
+      case "network":
+      case "unrecognized":
+        return 0;
+    }
   }
 
   function secondsUntil(instant: number): number {

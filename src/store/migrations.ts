@@ -19,4 +19,10 @@ export const Migrations: readonly string[] = [
     PRIMARY KEY (type, period, rank),
     FOREIGN KEY (type, period) REFERENCES toplist_snapshots (type, period) ON DELETE CASCADE
   ) STRICT;`,
+  `CREATE TABLE egress_states (
+    egress_id TEXT NOT NULL PRIMARY KEY,
+    cooldown_until TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    slowed_until TEXT
+  ) STRICT;`,
 ];
