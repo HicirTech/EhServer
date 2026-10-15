@@ -3,6 +3,7 @@ import type { Database } from "bun:sqlite";
 
 import type { ToplistPeriod } from "../domain/toplist";
 import type { ToplistEntryReading } from "../eh-core/toplist-page";
+import { readInstant } from "./instant";
 
 export interface ToplistSnapshot {
   readonly period: ToplistPeriod;
@@ -62,7 +63,7 @@ export function toplistSnapshotStore(db: Database): ToplistSnapshotStore {
 
       return {
         period,
-        observedAt: readInstant(snapshot.observed_at),
+        observedAt: readInstant(snapshot.observed_at, "toplist_snapshots.observed_at"),
         entries: selectEntries
           .all(GalleriesType, period)
           .map(({ rank, score, gid, token }) => ({ rank, score, gallery: { gid, token } })),
@@ -70,13 +71,4 @@ export function toplistSnapshotStore(db: Database): ToplistSnapshotStore {
     },
     put: (snapshot) => put(snapshot),
   };
-}
-
-function readInstant(text: string): Date {
-  const instant = new Date(text);
-  if (Number.isNaN(instant.getTime())) {
-    throw new Error(`toplist_snapshots.observed_at is not an instant: ${text}`);
-  }
-
-  return instant;
 }
