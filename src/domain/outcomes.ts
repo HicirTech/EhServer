@@ -75,6 +75,10 @@ export const ServerConditions = {
 
 export type OutcomeCode = keyof typeof Outcomes;
 
+export function isOutcomeCode(value: string): value is OutcomeCode {
+  return Object.hasOwn(Outcomes, value);
+}
+
 /** The codes a problem response can carry: no success, and no `cancelled`, which sends nothing. */
 export type ProblemCode =
   | Exclude<OutcomeCode, "ok" | "ok_empty" | "ok_degraded" | "cancelled">
