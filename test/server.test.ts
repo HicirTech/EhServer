@@ -1,4 +1,7 @@
-/** The vertical slice end to end: HTTP, toplist service, governor, egress, mock (N8; ADR-0010). */
+/**
+ * The vertical slice end to end: tokens, HTTP, toplist service, governor, egress, mock (N8;
+ * ADR-0006, ADR-0010).
+ */
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,7 +11,7 @@ import { CatalogSize } from "../mock/catalog";
 import { startMock } from "../mock/server";
 import { mockEgress } from "../src/egress/egress";
 import { createLogger } from "../src/log/logger";
-import { startServer } from "../src/main";
+import { createAdminToken, startServer } from "../src/main";
 import { responseFindings } from "./support/contract";
 
 const mock = startMock();
@@ -20,6 +23,7 @@ const server = startServer({
   port: 0,
   log: createLogger((line) => logLines.push(line)),
 });
+const adminSecret = createAdminToken(dataDir, "admin");
 
 afterAll(async () => {
   await server.stop();
@@ -30,14 +34,20 @@ afterAll(async () => {
 const PollMs = 20;
 const PollLimit = 250;
 
-async function getToplist(query: string, url = server.url): Promise<Response> {
-  return fetch(`${url}/api/v1/toplists/${query}`);
+function getToplist(query: string, url = server.url, secret = adminSecret): Promise<Response> {
+  return fetch(`${url}/api/v1/toplists/${query}`, {
+    headers: { Authorization: `Bearer ${secret}` },
+  });
 }
 
 /** Polls as a client would, until the answer is no longer 202. */
-async function whenServed(query: string, url = server.url): Promise<Response> {
+async function whenServed(
+  query: string,
+  url = server.url,
+  secret = adminSecret,
+): Promise<Response> {
   for (let attempt = 0; attempt < PollLimit; attempt++) {
-    const response = await getToplist(query, url);
+    const response = await getToplist(query, url, secret);
     if (response.status !== 202) {
       return response;
     }
@@ -70,6 +80,13 @@ describe("EhServer", () => {
     expect(served.headers.get("Server-Timing")).toContain("store;dur=");
   });
 
+  test("SEC-2: without a token nothing is served", async () => {
+    const response = await fetch(`${server.url}/api/v1/toplists/galleries?period=yesterday`);
+
+    expect(response.status).toBe(401);
+    expect(await responseFindings("getToplist", response)).toEqual([]);
+  });
+
   test("a toplist type not served yet is a 501 problem", async () => {
     const response = await getToplist("tagging?period=yesterday");
 
@@ -87,14 +104,17 @@ describe("EhServer", () => {
       log: createLogger(() => {}),
     };
     try {
+      const secret = createAdminToken(limitedDir, "admin");
       limitedMock.addFault({ fault: "http_429", pathPrefix: "/toplist.php", times: 1 });
       const first = startServer(options);
-      const limited = await (await whenServed("galleries?period=yesterday", first.url)).json();
+      const limited = await (
+        await whenServed("galleries?period=yesterday", first.url, secret)
+      ).json();
       await first.stop();
       limitedMock.clearRequests();
 
       const restarted = startServer(options);
-      const refused = await whenServed("galleries?period=pastMonth", restarted.url);
+      const refused = await whenServed("galleries?period=pastMonth", restarted.url, secret);
       const refusedBody = await refused.json();
       await restarted.stop();
 

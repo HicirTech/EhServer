@@ -71,8 +71,10 @@ export function startServer({
     send: withNetworkRetries((request) => lane.send(request, "background"), SystemClock.sleep),
     secondsPerPage: () => lane.secondsPerPage(),
   });
+  const tokens = apiTokens(apiTokenStore(db));
   const app = createApp({
     routes: [toplistRoute(toplists)],
+    authenticate: tokens.authenticate,
     onError: (error, requestId) => log.error("request failed", { requestId, error }),
   });
   const server = Bun.serve({ hostname: listen, port, fetch: (request) => app.fetch(request) });

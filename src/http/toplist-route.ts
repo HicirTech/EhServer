@@ -21,6 +21,7 @@ export function toplistRoute(toplists: ToplistService): Route {
   return {
     method: "GET",
     path: "/api/v1/toplists/:type",
+    scope: "read",
     handler: (_request, { params, url, requestId, timing }) => {
       const type = params.type;
       const period = url.searchParams.get("period");
