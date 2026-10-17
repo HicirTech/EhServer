@@ -27,6 +27,7 @@ tinyproxy 1.11 on a VPS answers a request without credentials with 407, and one 
 - A proxy that cannot be reached, or refuses the credentials with 407 or 401, fails the request as `egress_unavailable` ([outcomes.md](../outcomes.md)); it is retried only through the same proxy.
 - Every request carries the User-Agent most clients send: a fixed Chrome on Windows.
 - Page loads through a proxy keep ADR-0005's site pacing; while the page rate is halved, a waiting client's `Retry-After` counts the longer gap.
+- [`deploy/proxy-egress`](../../deploy/proxy-egress/) sets up such a proxy on a fresh VPS.
 
 ## Consequences
 
