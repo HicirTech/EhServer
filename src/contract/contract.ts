@@ -14,6 +14,8 @@ export interface ResponseSpec {
 export interface Contract {
   /** Null when the operation declares neither this status nor a default. */
   response(operationId: string, status: number): ResponseSpec | null;
+  /** The schema of the operation's JSON request body; null when it takes no body. */
+  requestBody(operationId: string): Schema | null;
   /** The problem every error answers with, also for paths no operation names. */
   problem(): ResponseSpec;
   resolve(ref: string): Schema;
@@ -54,6 +56,15 @@ export function loadContract(yaml: string): Contract {
     }
   }
 
+  const operation = (operationId: string): Schema => {
+    const found = operations.get(operationId);
+    if (found === undefined) {
+      throw new Error(`the contract has no operation ${operationId}`);
+    }
+
+    return found;
+  };
+
   const spec = (response: Schema, what: string): ResponseSpec => {
     const [contentType, media] =
       Object.entries(asObject(response.content, `${what} content`))[0] ?? [];
@@ -76,16 +87,21 @@ export function loadContract(yaml: string): Contract {
 
   return {
     response: (operationId, status) => {
-      const operation = operations.get(operationId);
-      if (operation === undefined) {
-        throw new Error(`the contract has no operation ${operationId}`);
-      }
-
-      const responses = asObject(operation.responses, `${operationId} responses`);
+      const responses = asObject(operation(operationId).responses, `${operationId} responses`);
       const declared = responses[String(status)] ?? responses.default;
       return declared === undefined
         ? null
         : spec(follow(declared, `${operationId} ${status}`), `${operationId} ${status}`);
+    },
+    requestBody: (operationId) => {
+      const body = operation(operationId).requestBody;
+      if (body === undefined) {
+        return null;
+      }
+
+      const what = `${operationId} request body`;
+      const content = asObject(follow(body, what).content, `${what} content`);
+      return follow(asObject(content["application/json"], `${what} JSON`).schema, `${what} schema`);
     },
     problem: () => spec(resolve("#/components/responses/Problem"), "Problem"),
     resolve,

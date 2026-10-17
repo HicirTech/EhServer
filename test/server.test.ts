@@ -40,6 +40,14 @@ function getToplist(query: string, url = server.url, secret = adminSecret): Prom
   });
 }
 
+function admin(method: string, path: string, body?: unknown): Promise<Response> {
+  return fetch(`${server.url}/api/v1/admin/${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${adminSecret}`, "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+}
+
 /** Polls as a client would, until the answer is no longer 202. */
 async function whenServed(
   query: string,
@@ -85,6 +93,30 @@ describe("EhServer", () => {
 
     expect(response.status).toBe(401);
     expect(await responseFindings("getToplist", response)).toEqual([]);
+  });
+
+  test("ADR-0006: an admin makes a user and a read token, which works until it is revoked", async () => {
+    const user = (await (await admin("POST", "users", { name: "reader" })).json()) as {
+      readonly id: string;
+    };
+    const created = await admin("POST", "tokens", {
+      userId: user.id,
+      name: "phone",
+      scopes: ["read"],
+    });
+    const { id, secret } = (await created.json()) as {
+      readonly id: string;
+      readonly secret: string;
+    };
+
+    const read = await whenServed("galleries?period=pastYear", server.url, secret);
+    const revoked = await admin("DELETE", `tokens/${id}`);
+    const refused = await getToplist("galleries?period=pastYear", server.url, secret);
+
+    expect(created.status).toBe(201);
+    expect(read.status).toBe(200);
+    expect(revoked.status).toBe(204);
+    expect(refused.status).toBe(401);
   });
 
   test("a toplist type not served yet is a 501 problem", async () => {

@@ -17,8 +17,8 @@ import { type Egress, mockEgress, proxyEgress } from "./egress/egress";
 import { proxyEgressProblem } from "./egress/proxy-check";
 import { withNetworkRetries } from "./governor/network-retries";
 import { createPageLane, pagePacingFor, SystemClock } from "./governor/page-lane";
+import { apiRoutes } from "./http/api-routes";
 import { createApp } from "./http/app";
-import { toplistRoute } from "./http/toplist-route";
 import { createLogger, type Logger } from "./log/logger";
 import { apiTokenStore } from "./store/api-tokens";
 import { openDatabase } from "./store/database";
@@ -73,7 +73,7 @@ export function startServer({
   });
   const tokens = apiTokens(apiTokenStore(db));
   const app = createApp({
-    routes: [toplistRoute(toplists)],
+    routes: apiRoutes({ toplists, users: userStore(db), tokens }),
     authenticate: tokens.authenticate,
     onError: (error, requestId) => log.error("request failed", { requestId, error }),
   });

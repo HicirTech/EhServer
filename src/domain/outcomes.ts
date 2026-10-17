@@ -68,6 +68,7 @@ export const ServerConditions = {
   forbidden: entry("failure", 403, "user_action", "Forbidden"),
   not_found: entry("failure", 404, "give_up", "Not found"),
   method_not_allowed: entry("failure", 405, "give_up", "Method not allowed"),
+  conflict: entry("failure", 409, "give_up", "Conflict"),
   client_rate_limited: entry("failure", 429, "retry_after", "Too many requests"),
   internal_error: entry("failure", 500, "give_up", "Internal error"),
   not_implemented: entry("failure", 501, "give_up", "Not implemented"),

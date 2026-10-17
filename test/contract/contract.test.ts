@@ -41,6 +41,24 @@ describe("contract", () => {
     expect(contract.response("getToplist", 503)?.contentType).toBe("application/problem+json");
   });
 
+  test("an operation's JSON request body is its schema, and an operation without one has none", () => {
+    expect(contract.requestBody("createUser")).toEqual({
+      type: "object",
+      required: ["name"],
+      properties: { name: { $ref: "#/components/schemas/UserName" } },
+    });
+    expect(contract.requestBody("importAccount")).toEqual(
+      contract.resolve("#/components/schemas/AccountImport"),
+    );
+    expect(contract.requestBody("getToplist")).toBeNull();
+  });
+
+  test("a request body that is not JSON fails loudly", () => {
+    expect(() => contract.requestBody("searchByImage")).toThrow(
+      "searchByImage request body JSON is not an object in the contract",
+    );
+  });
+
   test("an operation the contract does not have fails loudly", () => {
     expect(() => contract.response("getWeather", 200)).toThrow(
       "the contract has no operation getWeather",

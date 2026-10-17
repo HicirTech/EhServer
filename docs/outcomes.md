@@ -80,11 +80,12 @@ EhServer's own conditions use ordinary statuses, with these codes:
 
 | Code | Condition | API status | Client action |
 |---|---|---|---|
-| `invalid_request` | a parameter is missing or not one of its values | 400 | `give_up` |
+| `invalid_request` | a parameter or the body is missing or does not match the contract | 400 | `give_up` |
 | `unauthorized` | the token is missing or bad | 401 | `user_action` |
 | `forbidden` | the token lacks the scope | 403 | `user_action` |
 | `not_found` | no such resource | 404 | `give_up` |
 | `method_not_allowed` | the resource does not take that method | 405 | `give_up` |
+| `conflict` | the request clashes with what the server holds, such as a user name that is taken | 409 | `give_up` |
 | `client_rate_limited` | the client exceeds EhServer's own limits | 429 | `retry_after` |
 | `internal_error` | a fault in EhServer itself | 500 | `give_up` |
 | `not_implemented` | a toplist type that is not served yet ([ADR-0010](adr/0010-complete-toplists.md)) | 501 | `give_up` |
