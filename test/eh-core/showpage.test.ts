@@ -75,6 +75,14 @@ describe("parseShowpage", () => {
     });
   });
 
+  test("TEST-2: reads an answer without i7, as the site sends them now", () => {
+    const answer = { ...JSON.parse(showpageJson()), i7: undefined };
+
+    expect(reading(parseShowpage(JSON.stringify(answer), Page)).image.originalUrl).toBe(
+      OriginalUrl,
+    );
+  });
+
   test("REL-1, H5: an i7 that is neither text nor null is unrecognized", () => {
     const answer = { ...JSON.parse(showpageJson()), i7: 7 };
 

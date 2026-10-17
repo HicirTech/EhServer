@@ -61,10 +61,10 @@ function readExpectedPage(answer: JsonObject, expected: PageRef): void {
   need(answer.s === path ? answer.s : null, "showpage: s", JSON.stringify(answer.s));
 }
 
-/** `i7` held the original link until 2023-10; now it is null and the link is in `i6`. */
+/** `i7` held the original link until 2023-10; now it is null or left out, and the link is in `i6`. */
 function readOriginalField(value: unknown): string {
   return need(
-    value === null || typeof value === "string" ? (value ?? "") : null,
+    value === undefined || value === null || typeof value === "string" ? (value ?? "") : null,
     "showpage: i7",
     JSON.stringify(value),
   );
