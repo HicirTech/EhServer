@@ -3,6 +3,7 @@
  * again. A page that cannot be read ends the walk with the reason; the caller decides when to retry.
  */
 import type { ToplistPeriod } from "../domain/toplist";
+import { EgressUnavailableError } from "../egress/egress";
 import { classifyEnvelope } from "../eh-core/envelope";
 import type { Failure, Unrecognized } from "../eh-core/parse-result";
 import {
@@ -16,13 +17,14 @@ import type { UpstreamRequest } from "../eh-core/upstream-request";
 import type { PageAnswer, Refusal } from "../governor/page-lane";
 
 /**
- * Why a page could not be read: an outcome the site gave, an unknown page, no answer at all, or a
- * cooldown that kept the page from being sent.
+ * Why a page could not be read: an outcome the site gave, an unknown page, no answer at all, an
+ * egress that could not be used, or a cooldown that kept the page from being sent.
  */
 export type PageStop =
   | Failure
   | Unrecognized
   | { readonly kind: "network"; readonly message: string }
+  | { readonly kind: "egress_unavailable"; readonly message: string }
   | Refusal;
 
 export type ToplistWalkResult =
@@ -107,6 +109,10 @@ async function readPage(
   try {
     answer = await send(galleryToplistRequest(period, page));
   } catch (error) {
+    if (error instanceof EgressUnavailableError) {
+      return { kind: "egress_unavailable", message: error.message };
+    }
+
     return { kind: "network", message: error instanceof Error ? error.message : String(error) };
   }
 

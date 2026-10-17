@@ -36,13 +36,18 @@ interface SetupOptions {
   readonly store?: ToplistSnapshotStore;
   /** Wraps the service's page loads. */
   readonly through?: (send: Send) => Send;
+  readonly secondsPerPage?: () => number;
 }
 
 /**
  * A service over a new database, with a lane of its own, on a clock that moves only when the test
  * moves it. The lane keeps the same time, so its cooldowns end when the test says.
  */
-function setup({ store = newStore(), through = (send) => send }: SetupOptions = {}) {
+function setup({
+  store = newStore(),
+  through = (send) => send,
+  secondsPerPage = () => 4.5,
+}: SetupOptions = {}) {
   let time = Start;
   const clock: Clock = {
     now: () => time,
@@ -63,7 +68,7 @@ function setup({ store = newStore(), through = (send) => send }: SetupOptions = 
   const service = createToplistService({
     store,
     send: through(background),
-    secondsPerPage: 4.5,
+    secondsPerPage,
     now: () => time,
   });
   return {
@@ -110,6 +115,22 @@ describe("toplist service", () => {
     expect(answer.kind).toBe("snapshot");
     expect(answer.kind === "snapshot" && answer.snapshot.entries.length).toBe(CatalogSize);
     expect(observedAt(answer)).toBe("2026-10-11T00:00:00.000Z");
+  });
+
+  test("H2: a waiting client is told the time left at the lane's pace now, halved rate included", async () => {
+    let pace = 4.5;
+    const { service } = setup({ secondsPerPage: () => pace });
+    service.get("yesterday");
+
+    pace = 9;
+    const answer = service.get("yesterday");
+    await service.whenIdle();
+
+    expect(answer).toEqual({
+      kind: "pending",
+      progress: null,
+      retryAfterSeconds: Math.ceil(202 * 9),
+    });
   });
 
   test("ADR-0010: a fresh snapshot is served without reading the site", async () => {

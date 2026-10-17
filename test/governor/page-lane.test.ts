@@ -6,10 +6,17 @@ import { describe, expect, test } from "bun:test";
 
 import { type FaultName, faultResponse, isFaultName, RetryAfterSeconds } from "../../mock/faults";
 import type { OutcomeCode } from "../../src/domain/outcomes";
-import type { Egress } from "../../src/egress/egress";
+import type { Egress, EgressProfile } from "../../src/egress/egress";
 import type { UpstreamResponse } from "../../src/eh-core/envelope";
 import type { UpstreamRequest } from "../../src/eh-core/upstream-request";
-import { type Clock, createPageLane, SitePagePacing } from "../../src/governor/page-lane";
+import {
+  type Clock,
+  createPageLane,
+  MockPagePacing,
+  type Pacing,
+  pagePacingFor,
+  SitePagePacing,
+} from "../../src/governor/page-lane";
 import { openDatabase } from "../../src/store/database";
 import { type EgressStateStore, egressStateStore } from "../../src/store/egress-states";
 
@@ -257,5 +264,24 @@ describe("page lane", () => {
       { target: "/a", at: 15 * Minute },
       { target: "/b", at: 15 * Minute + 6_000 },
     ]);
+  });
+
+  test("H2: the time per page doubles while the rate is halved, and comes back after 24 h", async () => {
+    const clock = virtualClock();
+    const lane = createPageLane(recordingEgress(clock).egress, SitePagePacing, newStates(), clock);
+    const before = lane.secondsPerPage();
+
+    await lane.send(page("/too_fast_text"), "background");
+    const halved = lane.secondsPerPage();
+    await clock.sleep(24 * Hour);
+
+    expect([before, halved, lane.secondsPerPage()]).toEqual([4.5, 9, 4.5]);
+  });
+
+  test.each<[profile: EgressProfile, pacing: Pacing]>([
+    ["mock", MockPagePacing],
+    ["proxy:vps", SitePagePacing],
+  ])("SITE-1: a %s egress is paced as ADR-0005 says", (profile, pacing) => {
+    expect(pagePacingFor(profile)).toEqual(pacing);
   });
 });

@@ -6,7 +6,7 @@
  * (nfr.md H2, REL-3).
  */
 import type { OutcomeCode } from "../domain/outcomes";
-import type { Egress } from "../egress/egress";
+import type { Egress, EgressProfile } from "../egress/egress";
 import { classifyEnvelope, type UpstreamResponse } from "../eh-core/envelope";
 import type { UpstreamRequest } from "../eh-core/upstream-request";
 import type { EgressStateStore } from "../store/egress-states";
@@ -26,6 +26,10 @@ export const MockPagePacing: Pacing = { minGapMs: 0, maxGapMs: 0 };
 
 export function averageGapSeconds(pacing: Pacing): number {
   return (pacing.minGapMs + pacing.maxGapMs) / 2 / 1000;
+}
+
+export function pagePacingFor(profile: EgressProfile): Pacing {
+  return profile === "mock" ? MockPagePacing : SitePagePacing;
 }
 
 export interface Clock {
@@ -55,6 +59,8 @@ export type PageAnswer =
 export interface PageLane {
   /** Rejects only for a transport error; an answer of any status, and a refusal, resolve. */
   send(request: UpstreamRequest, priority: Priority): Promise<PageAnswer>;
+  /** The average time from one page load's start to the next, at the lane's pace now. */
+  secondsPerPage(): number;
 }
 
 interface Waiting {
@@ -125,12 +131,13 @@ export function createPageLane(
     }
   }
 
-  function gapMs(): number {
-    const gap = pacing.minGapMs + random() * (pacing.maxGapMs - pacing.minGapMs);
+  function gapFactor(): number {
     const slowedUntil = state?.slowedUntil ?? null;
-    return slowedUntil !== null && slowedUntil.getTime() > clock.now()
-      ? gap * SlowedGapFactor
-      : gap;
+    return slowedUntil !== null && slowedUntil.getTime() > clock.now() ? SlowedGapFactor : 1;
+  }
+
+  function gapMs(): number {
+    return (pacing.minGapMs + random() * (pacing.maxGapMs - pacing.minGapMs)) * gapFactor();
   }
 
   /** An outcome whose scope is the egress (outcomes.md section 4) rests its page loads. */
@@ -163,5 +170,6 @@ export function createPageLane(
           void run();
         }
       }),
+    secondsPerPage: () => averageGapSeconds(pacing) * gapFactor(),
   };
 }

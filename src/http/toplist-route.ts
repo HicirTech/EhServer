@@ -89,6 +89,8 @@ function stopCode(stop: PageStop): ProblemCode {
       return stop.code;
     case "network":
       return "network";
+    case "egress_unavailable":
+      return "egress_unavailable";
     case "unrecognized":
       return "upstream_unrecognized";
     case "refused":
@@ -103,6 +105,8 @@ function stopDetail(stop: PageStop): string {
       return stop.message;
     case "network":
       return "the site did not answer";
+    case "egress_unavailable":
+      return stop.message;
     case "unrecognized":
       return `a toplist page was not recognized at ${stop.marker}`;
     case "refused":
