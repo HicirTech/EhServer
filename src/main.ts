@@ -1,14 +1,14 @@
 /**
- * Starts EhServer. Requests go to the mock, or to the site through a proxy (ADR-0011); no egress
- * sends from this machine's own connection.
+ * Starts EhServer from its one configuration file (ADR-0012). Requests go to the mock, or to the
+ * site through a proxy (ADR-0011); no egress sends from this machine's own connection.
  *
- * Usage: bun src/main.ts --data <folder> (--mock <mock url> | --proxy <name>=<proxy url>)
- *        [--listen 127.0.0.1] [--port 8080]
+ * Usage: bun src/main.ts --config <file>
  */
-import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
+import { type EgressConfig, readConfig, type ServerConfig } from "./config/config";
 import { type Egress, mockEgress, proxyEgress } from "./egress/egress";
 import { proxyEgressProblem } from "./egress/proxy-check";
 import { withNetworkRetries } from "./governor/network-retries";
@@ -26,11 +26,9 @@ const DefaultListen = "127.0.0.1";
 const DefaultPort = 8080;
 const DatabaseFile = "ehserver.db";
 const UsageExitCode = 64;
-/** sysexits EX_CONFIG: the proxy on the command line may not be used. */
-const RefusedProxyExitCode = 78;
-const ProxyName = /^[a-z0-9][a-z0-9-]*$/;
-const Usage =
-  "usage: --data <folder> (--mock <mock url> | --proxy <name>=<proxy url>) [--listen <address>] [--port <port>]";
+/** sysexits EX_CONFIG: the configuration, or the proxy it names, may not be used. */
+const RefusedConfigExitCode = 78;
+const Usage = "usage: --config <file>";
 
 export interface ServerOptions {
   readonly dataDir: string;
@@ -79,61 +77,63 @@ export function startServer({
   };
 }
 
-/** `<name>=<url>`, or null when the argument is not one. */
-function parseProxyArgument(argument: string): { name: string; url: URL } | null {
-  const separator = argument.indexOf("=");
-  const name = argument.slice(0, separator);
-  const url = URL.parse(argument.slice(separator + 1));
-  return separator > 0 && ProxyName.test(name) && url !== null ? { name, url } : null;
+/** The configuration in the file at `path`; exits when it cannot be used. */
+function configFrom(path: string, log: Logger): ServerConfig {
+  let text: string;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch {
+    log.error("configuration refused", { problems: [`cannot read ${path}`] });
+    process.exit(RefusedConfigExitCode);
+  }
+
+  const reading = readConfig(text, dirname(resolve(path)), process.env);
+  if (reading.kind === "refused") {
+    log.error("configuration refused", { problems: reading.problems });
+    process.exit(RefusedConfigExitCode);
+  }
+
+  return reading.config;
 }
 
-/** The egress the command line names, once its start-up check passed; exits otherwise. */
-async function commandLineEgress(
-  mock: string | undefined,
-  proxy: string | undefined,
-  log: Logger,
-): Promise<Egress> {
-  if (mock !== undefined && proxy === undefined) {
-    return mockEgress(mock);
+/** The egress the configuration names, once its start-up check passed; exits otherwise. */
+async function checkedEgress(egress: EgressConfig, log: Logger): Promise<Egress> {
+  if (egress.profile === "mock") {
+    return mockEgress(egress.url);
   }
 
-  const named = mock === undefined && proxy !== undefined ? parseProxyArgument(proxy) : null;
-  if (named === null) {
-    log.error(Usage);
-    process.exit(UsageExitCode);
-  }
-
-  const problem = await proxyEgressProblem(named.url);
+  const problem = await proxyEgressProblem(egress.url);
   if (problem !== null) {
-    log.error("proxy refused", { proxy: named.name, problem });
-    process.exit(RefusedProxyExitCode);
+    log.error("proxy refused", { proxy: egress.name, problem });
+    process.exit(RefusedConfigExitCode);
   }
 
-  return proxyEgress(named.name, named.url);
+  return proxyEgress(egress.name, egress.url);
+}
+
+/** The path given with `--config`, or null for any other command line. */
+function configPath(args: string[]): string | null {
+  try {
+    return parseArgs({ args, options: { config: { type: "string" } } }).values.config ?? null;
+  } catch {
+    return null;
+  }
 }
 
 if (import.meta.main) {
   const log = createLogger((line) => process.stdout.write(line));
-  const { values } = parseArgs({
-    args: Bun.argv.slice(2),
-    options: {
-      data: { type: "string" },
-      mock: { type: "string" },
-      proxy: { type: "string" },
-      listen: { type: "string" },
-      port: { type: "string" },
-    },
-  });
-  if (values.data === undefined) {
+  const path = configPath(Bun.argv.slice(2));
+  if (path === null) {
     log.error(Usage);
     process.exit(UsageExitCode);
   }
 
+  const config = configFrom(path, log);
   startServer({
-    dataDir: values.data,
-    egress: await commandLineEgress(values.mock, values.proxy, log),
-    listen: values.listen,
-    port: values.port === undefined ? undefined : Number(values.port),
+    dataDir: config.dataDir,
+    egress: await checkedEgress(config.egress, log),
+    listen: config.listen,
+    port: config.port,
     log,
   });
 }

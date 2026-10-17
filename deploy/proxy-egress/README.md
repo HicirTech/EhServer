@@ -21,11 +21,22 @@ Choose a region from which the site can be reached: on 2026-10-17 it answered HT
 
 ## Start EhServer through it
 
-```sh
-bun src/main.ts --data <folder> --proxy vps=http://ehserver:<password>@<VPS address>:8888
+Put the password into the environment of EhServer's process, for example as `PROXY_PASSWORD`, and name that variable in the configuration file ([ADR-0012](../../docs/adr/0012-configuration-file.md)), which holds no secret itself:
+
+```toml
+data_dir = "data"
+
+[egress]
+profile = "proxy:vps"
+url = "http://ehserver@<VPS address>:8888"
+password_env = "PROXY_PASSWORD"
 ```
 
-EhServer does not start while `NO_PROXY` or `no_proxy` is set, when the proxy's address is not public, or when the proxy does not accept connections. Until EhServer reads a configuration file (nfr.md OPS-1), the password is visible in the process list of that machine; the address allowlist is what keeps everyone else out.
+```sh
+bun src/main.ts --config ehserver.toml
+```
+
+EhServer does not start while `NO_PROXY` or `no_proxy` is set, when the proxy's address is not public, or when the proxy does not accept connections.
 
 ## Check the proxy once
 

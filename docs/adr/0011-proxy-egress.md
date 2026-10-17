@@ -18,7 +18,7 @@ tinyproxy 1.11 on a VPS answers a request without credentials with 407, and one 
 
 ## Decision
 
-- The egress that reaches the site is `proxy:<name>`, started with `--proxy <name>=<url>`. Every request names the proxy, so none leaves without it. `direct` and `probe` are not built.
+- The egress that reaches the site is `proxy:<name>`, named in the configuration file ([ADR-0012](0012-configuration-file.md)). Every request names the proxy, so none leaves without it. `direct` and `probe` are not built.
 - The server starts only when the proxy passes these checks, in this order, none of which sends anything to the site or to another service:
   1. the proxy is `http://` or `https://`;
   2. `NO_PROXY` and `no_proxy` are unset;
@@ -34,5 +34,5 @@ tinyproxy 1.11 on a VPS answers a request without credentials with 407, and one 
 - A proxy reached through an SSH or WireGuard tunnel has a local address and is refused. Such a tunnel needs a check of its own before it can be allowed.
 - A proxy's own 403 or 502 is classified as if the site had sent it: a 502 rests the egress like `upstream_unavailable`, and a 403 stops a read as `upstream_unrecognized`.
 - The other way round, a 401 from the site, should it ever send one, is taken for the proxy refusing the credentials.
-- The proxy URL, credentials included, is on the command line until the configuration file of nfr.md OPS-1 exists. Logs and problems name the proxy, never its URL.
+- The proxy's password is read from an environment variable the configuration names, never from the file or the command line (ADR-0012). Logs and problems name the proxy, never its URL.
 - A machine whose environment sets `NO_PROXY` cannot start a proxy egress until it is removed.
