@@ -176,6 +176,8 @@ paths:
         (ADR-0010). Without a snapshot the server starts reading the toplist and
         answers 202; ask again after `Retry-After`. Only `galleries` is served for
         now; the other types answer 501.
+      security:
+        - bearerAuth: [read]
       parameters:
         - name: type
           in: path
@@ -801,11 +803,61 @@ paths:
         default:
           $ref: '#/components/responses/Problem'
 
+  /admin/users:
+    get:
+      tags: [admin]
+      operationId: listUsers
+      summary: Users
+      security:
+        - bearerAuth: [admin]
+      responses:
+        '200':
+          description: Every user, by name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      tags: [admin]
+      operationId: createUser
+      summary: Create a user
+      security:
+        - bearerAuth: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  $ref: '#/components/schemas/UserName'
+      responses:
+        '201':
+          description: The user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        default:
+          $ref: '#/components/responses/Problem'
+
   /admin/accounts:
     get:
       tags: [admin]
       operationId: listAccounts
       summary: All E-Hentai accounts known to the server
+      security:
+        - bearerAuth: [admin]
       responses:
         '200':
           description: Accounts without their credentials.
@@ -825,6 +877,8 @@ paths:
       tags: [admin]
       operationId: importAccount
       summary: Import an account's cookies for a user
+      security:
+        - bearerAuth: [admin]
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -848,6 +902,8 @@ paths:
       tags: [admin]
       operationId: removeAccount
       summary: Remove an account and its stored credentials
+      security:
+        - bearerAuth: [admin]
       parameters:
         - $ref: '#/components/parameters/Id'
       responses:
@@ -861,6 +917,8 @@ paths:
       tags: [admin]
       operationId: listTokens
       summary: API tokens
+      security:
+        - bearerAuth: [admin]
       responses:
         '200':
           description: Tokens without their secrets.
@@ -880,6 +938,8 @@ paths:
       tags: [admin]
       operationId: createToken
       summary: Create an API token for a user
+      security:
+        - bearerAuth: [admin]
       requestBody:
         required: true
         content:
@@ -891,12 +951,16 @@ paths:
                 userId:
                   type: string
                 name:
-                  type: string
+                  $ref: '#/components/schemas/TokenName'
                 scopes:
                   type: array
                   minItems: 1
                   items:
                     $ref: '#/components/schemas/Scope'
+                expiresAt:
+                  type: string
+                  format: date-time
+                  description: When the token stops working; without it, it works until it is revoked.
       responses:
         '201':
           description: The token; its secret is shown only here.
@@ -912,6 +976,8 @@ paths:
       tags: [admin]
       operationId: revokeToken
       summary: Revoke an API token
+      security:
+        - bearerAuth: [admin]
       parameters:
         - $ref: '#/components/parameters/Id'
       responses:
@@ -925,6 +991,8 @@ paths:
       tags: [admin]
       operationId: listSamples
       summary: Saved upstream samples
+      security:
+        - bearerAuth: [admin]
       parameters:
         - $ref: '#/components/parameters/Cursor'
       responses:
@@ -950,6 +1018,8 @@ paths:
       tags: [admin]
       operationId: getDebugBundle
       summary: Logs, job timelines and samples, redacted
+      security:
+        - bearerAuth: [admin]
       responses:
         '200':
           description: A zip archive.
@@ -966,6 +1036,9 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
+      description: |
+        An API token (ADR-0006), sent as `Authorization: Bearer <secret>`. An
+        operation lists the scope its token needs; `admin` grants every scope.
 
   headers:
     RequestId:
@@ -1866,6 +1939,28 @@ components:
       type: string
       enum: [read, write, jobs, admin]
 
+    UserName:
+      type: string
+      pattern: '^[a-z0-9][a-z0-9_-]{0,31}$'
+
+    User:
+      type: object
+      required: [id, name, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          $ref: '#/components/schemas/UserName'
+        createdAt:
+          type: string
+          format: date-time
+
+    TokenName:
+      type: string
+      description: Which device or app holds the token.
+      minLength: 1
+      maxLength: 100
+
     ApiToken:
       type: object
       required: [id, userId, name, scopes, createdAt]
@@ -1875,12 +1970,15 @@ components:
         userId:
           type: string
         name:
-          type: string
+          $ref: '#/components/schemas/TokenName'
         scopes:
           type: array
           items:
             $ref: '#/components/schemas/Scope'
         createdAt:
+          type: string
+          format: date-time
+        expiresAt:
           type: string
           format: date-time
         lastUsedAt:
