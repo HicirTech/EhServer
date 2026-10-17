@@ -4,7 +4,7 @@
  */
 import { resolve } from "node:path";
 
-import { checkSchema, type Resolve, type Schema } from "../contract/schema";
+import { checkSchema, findingText, type Resolve, type Schema } from "../contract/schema";
 
 export type EgressConfig =
   | { readonly profile: "mock"; readonly url: string }
@@ -71,10 +71,7 @@ export function readConfig(
 
   const findings = checkSchema(ConfigSchema, value, noReferences);
   if (findings.length > 0) {
-    return {
-      kind: "refused",
-      problems: findings.map(({ path, message }) => `${path}: ${message}`),
-    };
+    return { kind: "refused", problems: findings.map(findingText) };
   }
 
   const file = value as ConfigFile;

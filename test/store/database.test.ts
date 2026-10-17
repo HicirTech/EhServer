@@ -47,6 +47,13 @@ describe("openDatabase", () => {
     db.close();
   });
 
+  test("a write waits for another connection's write, such as the command line's, instead of failing", () => {
+    const db = openDatabase(databasePath());
+
+    expect(db.query("PRAGMA busy_timeout").get()).toEqual({ timeout: 5000 });
+    db.close();
+  });
+
   test("REL-3: opening it again runs no step twice", () => {
     const path = databasePath();
     openDatabase(path, ["CREATE TABLE first (x INTEGER) STRICT;"]).close();
