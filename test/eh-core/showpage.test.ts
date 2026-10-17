@@ -83,6 +83,23 @@ describe("parseShowpage", () => {
     );
   });
 
+  test("TEST-2: reads the served file of a resampled image, whose address names the original too", () => {
+    const imageUrl =
+      "http://198.51.100.7:2688/om/123456789/fedcba9876543210fedcba9876543210fedcba98-3410910-7016-4961-jpg/0123456789abcdef0123456789abcdef01234567-79980-1280-905-wbp/1280/0a1b2c3d4e5f6g7h8i9/000.webp";
+
+    const { image } = reading(
+      parseShowpage(showpageJson({ imageUrl, width: 1280, height: 905 }), Page),
+    );
+
+    expect(image.file).toEqual({
+      sha1: "0123456789abcdef0123456789abcdef01234567",
+      size: 79980,
+      width: 1280,
+      height: 905,
+      format: "wbp",
+    });
+  });
+
   test("REL-1, H5: an i7 that is neither text nor null is unrecognized", () => {
     const answer = { ...JSON.parse(showpageJson()), i7: 7 };
 
