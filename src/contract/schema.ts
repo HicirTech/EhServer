@@ -38,6 +38,11 @@ const KnownKeywords = new Set([
 /** Every instant is UTC (domain-model.md I6). */
 const DateTimePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 
+/** Such as `$.port: above the maximum 65535`. */
+export function findingText({ path, message }: Finding): string {
+  return `${path}: ${message}`;
+}
+
 export function checkSchema(
   schema: Schema,
   value: unknown,

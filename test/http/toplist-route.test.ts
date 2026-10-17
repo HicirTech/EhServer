@@ -1,6 +1,7 @@
 /** `GET /api/v1/toplists/{type}` (ADR-0010; api/openapi.yaml getToplist; nfr.md H5). */
 import { describe, expect, test } from "bun:test";
 
+import type { Principal } from "../../src/auth/api-tokens";
 import type { ToplistPeriod } from "../../src/domain/toplist";
 import { failure, unrecognized } from "../../src/eh-core/parse-result";
 import { createApp } from "../../src/http/app";
@@ -9,6 +10,10 @@ import type { ToplistAnswer, ToplistService } from "../../src/toplists/service";
 import { responseFindings } from "../support/contract";
 
 const RequestId = "req_test";
+const Callers = new Map<string, Principal>([
+  ["ehs_reader", { tokenId: "tok_reader", userId: "usr_reader", scopes: ["read"] }],
+  ["ehs_jobs", { tokenId: "tok_jobs", userId: "usr_jobs", scopes: ["jobs"] }],
+]);
 
 /** A service that gives one answer and records which periods it was asked for. */
 function serving(answer: ToplistAnswer) {
@@ -22,12 +27,18 @@ function serving(answer: ToplistAnswer) {
   };
   const app = createApp({
     routes: [toplistRoute(service)],
+    authenticate: (secret) => Callers.get(secret) ?? null,
     onError: () => {},
     newRequestId: () => RequestId,
   });
   return {
     asked,
-    get: (path: string) => app.fetch(new Request(`http://127.0.0.1/api/v1/toplists/${path}`)),
+    get: (path: string, secret = "ehs_reader") =>
+      app.fetch(
+        new Request(`http://127.0.0.1/api/v1/toplists/${path}`, {
+          headers: { Authorization: `Bearer ${secret}` },
+        }),
+      ),
   };
 }
 
@@ -184,6 +195,16 @@ describe("toplist route", () => {
       retryAfter: 600,
       detail: "the egress rests until 2026-10-11T08:02:00.000Z after upstream_rate_limited",
     });
+  });
+
+  test("ADR-0006: a token without the read scope is forbidden, and the service is not asked", async () => {
+    const { get, asked } = serving(Snapshot);
+
+    const response = await get("galleries?period=yesterday", "ehs_jobs");
+
+    expect(response.status).toBe(403);
+    expect(await responseFindings("getToplist", response)).toEqual([]);
+    expect(asked).toEqual([]);
   });
 
   test.each([

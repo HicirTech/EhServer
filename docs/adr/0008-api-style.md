@@ -13,6 +13,7 @@
 - Every response carries `X-Request-Id` and `Server-Timing`.
 - Writes take an `Idempotency-Key` header.
 - Tests check responses against the contract with our own checker (`src/contract/`). It knows exactly the JSON Schema the contract uses, and fails on any other keyword instead of skipping it. Objects are closed: a property the contract does not declare is a finding, so no undeclared field reaches a client.
+- The server checks every JSON request body against the same contract with the same checker before a handler reads it. A body that does not match is `invalid_request`, and its detail names each finding.
 
 ## Consequences
 

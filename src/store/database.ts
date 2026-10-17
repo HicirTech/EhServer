@@ -3,11 +3,15 @@ import { Database } from "bun:sqlite";
 
 import { Migrations } from "./migrations";
 
+/** How long a write waits for another one, such as the command line's while the server runs. */
+const BusyTimeoutMs = 5000;
+
 export function openDatabase(path: string, migrations: readonly string[] = Migrations): Database {
   const db = new Database(path, { create: true, strict: true });
   try {
     db.exec("PRAGMA journal_mode = WAL;");
     db.exec("PRAGMA foreign_keys = ON;");
+    db.exec(`PRAGMA busy_timeout = ${BusyTimeoutMs};`);
     migrate(db, migrations);
     return db;
   } catch (error) {

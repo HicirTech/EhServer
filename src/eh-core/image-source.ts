@@ -23,8 +23,14 @@ export interface ImageSource {
 
 /** The site's image for "limit reached" (wiki: Limits-and-Anti-Crawling). */
 const QuotaImage = /\/509s?\.gif$/;
-/** H@H addresses name the file: `/h/<sha1>-<size>-<width>-<height>-<extension>/`. */
-const FileKeyPattern = /\/h\/([0-9a-f]{40})-(\d+)-(\d+)-(\d+)-([a-z0-9]+)\//;
+/**
+ * H@H addresses name the file they serve, as `<sha1>-<size>-<width>-<height>-<extension>`: after
+ * `/h/`, or for an image resampled from a larger original after `/om/<n>/<original>/`.
+ */
+const FileKeyPatterns: readonly RegExp[] = [
+  /\/h\/([0-9a-f]{40})-(\d+)-(\d+)-(\d+)-([a-z0-9]+)\//,
+  /\/om\/\d+\/[0-9a-f]{40}-\d+-\d+-\d+-[a-z0-9]+\/([0-9a-f]{40})-(\d+)-(\d+)-(\d+)-([a-z0-9]+)\/\d+\//,
+];
 const ReloadKeyPattern = /\bnl\('([^']+)'\)/;
 
 export function isQuotaImage(url: string | undefined): boolean {
@@ -49,7 +55,7 @@ export function readImageSource(
 }
 
 function readFileKey(url: string): ImageFileKey | null {
-  const match = FileKeyPattern.exec(url);
+  const match = FileKeyPatterns.map((pattern) => pattern.exec(url)).find((found) => found !== null);
   if (match?.[1] === undefined || match[5] === undefined) {
     return null;
   }

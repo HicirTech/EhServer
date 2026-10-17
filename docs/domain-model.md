@@ -97,8 +97,8 @@ The upstream category bitmask (`f_cats` excludes, not includes) and the label st
 
 | Entity | Fields |
 |---|---|
-| `User` | `id`, `name` |
-| `ApiToken` | `id`, `scopes`, `createdAt`, `lastUsedAt`, `revokedAt`; the secret is shown once |
+| `User` | `id`, `name` (unique), `createdAt` |
+| `ApiToken` | `id`, `userId`, `name`, `scopes`, `createdAt`, `expiresAt` (optional), `lastUsedAt`, `revokedAt`; the secret is shown once and only its hash is kept |
 | `Account` | `id`, `userId`, `egressId`, `state` (AccountState); credentials are never returned |
 | `Egress` | `id`, `kind` (`mock`, `probe`, `direct`, `proxy`), `state` (`ok`, `warned`, `cooldown`, `banned`, `degraded`, `unavailable`), `cooldownUntil`, `reason` (outcome code), `accountCount`, `sharedWarning` |
 | `Job` | `id`, `kind` (`download`, `archiveDownload`, `refresh`), `userId`, `accountId`, `target` (gallery ref), `options` (variant, GP budget), `state`, `progress` (`pages` done and total, `bytes`), `outcome` (final), `idempotencyKey`, `createdAt`, `updatedAt`, `steps` (each with its outcome and timing) |
