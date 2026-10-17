@@ -43,6 +43,12 @@ const Snapshot: ToplistAnswer = {
   },
 };
 
+const Unavailable: ToplistAnswer = {
+  kind: "stopped",
+  stop: { kind: "egress_unavailable", message: "proxy vps does not accept connections" },
+  retryAfterSeconds: 600,
+};
+
 const Refused: ToplistAnswer = {
   kind: "stopped",
   stop: {
@@ -151,6 +157,20 @@ describe("toplist route", () => {
     expect(body).not.toContain("127.0.0.1");
   });
 
+  test("H7: an egress that cannot be used is egress_unavailable, naming the egress", async () => {
+    const { get } = serving(Unavailable);
+
+    const response = await get("galleries?period=yesterday");
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      code: "egress_unavailable",
+      clientAction: "retry_after",
+      retryAfter: 600,
+      detail: "proxy vps does not accept connections",
+    });
+  });
+
   test("H2: a walk refused while the egress rests is egress_cooldown, saying why and until when", async () => {
     const { get } = serving(Refused);
 
@@ -212,6 +232,7 @@ describe("toplist route", () => {
       { kind: "stopped", stop: { kind: "network", message: "reset" }, retryAfterSeconds: 600 },
       "galleries?period=yesterday",
     ],
+    ["an egress that cannot be used", Unavailable, "galleries?period=yesterday"],
     ["a walk refused while the egress rests", Refused, "galleries?period=yesterday"],
     ["an unknown period", Snapshot, "galleries?period=lastWeek"],
     ["a type not served yet", Snapshot, "uploaders?period=yesterday"],

@@ -4,7 +4,7 @@ import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { CatalogSize, toplistGids } from "../../mock/catalog";
 import { RetryAfterSeconds } from "../../mock/faults";
 import { startMock } from "../../mock/server";
-import { mockEgress } from "../../src/egress/egress";
+import { EgressUnavailableError, mockEgress } from "../../src/egress/egress";
 import type { UpstreamRequest } from "../../src/eh-core/upstream-request";
 import { createPageLane, MockPagePacing, type PageAnswer } from "../../src/governor/page-lane";
 import { openDatabase } from "../../src/store/database";
@@ -112,6 +112,17 @@ describe("walkGalleryToplist", () => {
     expect(await walkGalleryToplist("yesterday", newSend())).toMatchObject({
       kind: "stopped",
       stop: { kind: "network" },
+    });
+  });
+
+  test("H7: an egress that cannot be used stops the walk as egress_unavailable", async () => {
+    const unavailable = async (): Promise<PageAnswer> => {
+      throw new EgressUnavailableError("proxy vps does not accept connections");
+    };
+
+    expect(await walkGalleryToplist("yesterday", unavailable)).toEqual({
+      kind: "stopped",
+      stop: { kind: "egress_unavailable", message: "proxy vps does not accept connections" },
     });
   });
 

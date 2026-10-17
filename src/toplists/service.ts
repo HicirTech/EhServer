@@ -130,6 +130,7 @@ export function createToplistService({
       case "refused":
         return stop.until.getTime() - now();
       case "network":
+      case "egress_unavailable":
       case "unrecognized":
         return 0;
     }
