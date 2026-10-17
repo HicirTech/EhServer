@@ -25,4 +25,20 @@ export const Migrations: readonly string[] = [
     reason TEXT NOT NULL,
     slowed_until TEXT
   ) STRICT;`,
+  `CREATE TABLE users (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+  ) STRICT;
+  CREATE TABLE api_tokens (
+    id TEXT NOT NULL PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    scopes TEXT NOT NULL,
+    secret_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT,
+    last_used_at TEXT,
+    revoked_at TEXT
+  ) STRICT;`,
 ];

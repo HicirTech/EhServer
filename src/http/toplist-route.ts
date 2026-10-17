@@ -2,6 +2,7 @@
  * `GET /api/v1/toplists/{type}?period=` (ADR-0010): the whole toplist, 202 while it is being read,
  * or the problem that stopped the last read.
  */
+import { isOneOf } from "../domain/one-of";
 import type { ProblemCode } from "../domain/outcomes";
 import {
   type ToplistPeriod,
@@ -112,11 +113,4 @@ function stopDetail(stop: PageStop): string {
     case "refused":
       return `the egress rests until ${stop.until.toISOString()} after ${stop.reason}`;
   }
-}
-
-function isOneOf<T extends string>(
-  values: readonly T[],
-  value: string | null | undefined,
-): value is T {
-  return values.some((known) => known === value);
 }
