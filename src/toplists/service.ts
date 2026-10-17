@@ -37,8 +37,8 @@ export interface ToplistServiceOptions {
   readonly store: ToplistSnapshotStore;
   /** Background page loads, network retries included. */
   readonly send: (request: UpstreamRequest) => Promise<PageAnswer>;
-  /** The average time between page loads, to tell a waiting client when to come back. */
-  readonly secondsPerPage: number;
+  /** The average time between page loads now, to tell a waiting client when to come back. */
+  readonly secondsPerPage: () => number;
   readonly now?: () => number;
 }
 
@@ -142,7 +142,7 @@ export function createToplistService({
 
   function walkSecondsLeft(progress: WalkProgress | null): number {
     const pages = progress === null ? AssumedWalkPages : progress.pagesTotal - progress.pagesDone;
-    return Math.max(1, Math.ceil(pages * secondsPerPage));
+    return Math.max(1, Math.ceil(pages * secondsPerPage()));
   }
 
   return {

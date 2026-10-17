@@ -6,6 +6,7 @@ import { join } from "node:path";
 
 import { CatalogSize } from "../mock/catalog";
 import { startMock } from "../mock/server";
+import { mockEgress } from "../src/egress/egress";
 import { createLogger } from "../src/log/logger";
 import { startServer } from "../src/main";
 import { responseFindings } from "./support/contract";
@@ -15,7 +16,7 @@ const dataDir = mkdtempSync(join(tmpdir(), "ehserver-data-"));
 const logLines: string[] = [];
 const server = startServer({
   dataDir,
-  mockUrl: mock.url,
+  egress: mockEgress(mock.url),
   port: 0,
   log: createLogger((line) => logLines.push(line)),
 });
@@ -81,7 +82,7 @@ describe("EhServer", () => {
     const limitedDir = mkdtempSync(join(tmpdir(), "ehserver-data-"));
     const options = {
       dataDir: limitedDir,
-      mockUrl: limitedMock.url,
+      egress: mockEgress(limitedMock.url),
       port: 0,
       log: createLogger(() => {}),
     };
